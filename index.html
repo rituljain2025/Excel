@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="style.css">
+    <title>Excel Grid</title>
+</head>
+<body>
+    
+    <nav class="navbar">
+        <h1>Excel Grid</h1>
+        <button class="nav-button" id="countBtn">Count</button>
+        <button class="nav-button" id="minBtn">Min</button>
+        <button class="nav-button" id="maxBtn">Max</button>
+        <button class="nav-button" id="sumBtn">Sum</button>
+        <button class="nav-button" id="avgBtn">Average</button>
+        <button class="nav-button load-data" id="loadDataBtn">Load Sample Data</button>
+        <input type="file" id="fileInput" accept=".json,.csv">
+        <div class="stats-display hidden" id="statsDisplay">
+            Select cells to see statistics
+        </div>
+    </nav>
+    <div id="container">
+         <div id="spacer"></div>
+        <canvas id="excelCanvas"></canvas>
+    </div>
+    <script type="module" src="./dist/main.js"></script>
+    <!-- <script src="script.js"></script> -->
+</body>
+</html>

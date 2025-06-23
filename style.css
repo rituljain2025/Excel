@@ -1,0 +1,70 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+#container {
+  width: 100vw;
+  height: 100vh;
+  overflow: scroll;
+  position: relative;
+}
+
+
+#spacer {
+  position: absolute; 
+  top: 0;
+  left: 0;
+ 
+  width: 50000px; 
+  height: 2500000px;
+  
+}
+
+#excelCanvas {
+  cursor:  cell;
+  pointer-events: auto;
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 10;
+  width: 100vw;
+  height: 100vh;
+}
+.navbar {
+    background-color:#168043 ;
+    padding: 12px 20px;
+    box-shadow: 0 2px 10px rgba(255, 255, 255, 0.1);
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    height: 60px;
+    color: white;
+}
+
+
+#container {
+    width: 100vw;
+    height: 100vh;
+    overflow: scroll;
+    position: relative;
+    padding-top: 60px; 
+}
+
+
+#excelCanvas {
+    cursor: cell;
+    pointer-events: auto;
+    position: fixed;
+    top: 60px;
+    left: 0;
+    z-index: 10;
+    width: 100vw;
+    height: calc(100vh - 60px);
+}
