@@ -39,24 +39,29 @@ export class CellEditor {
 
     if (col === -1 || row === -1) return;
 
-    const cellX = this.grid.getColumnX(col) - scrollLeft;
-    const cellY = this.grid.getRowY(row) - scrollTop;
+    const cellX = this.grid.getColumnX(col);
+    const cellY = this.grid.getRowY(row);
     const cellW = this.grid.getColWidth(col);
     const cellH = this.grid.getRowHeight(row);
 
     const input = document.createElement("input");
+
     input.type = "text";
     input.value = this.grid.getCellData(row, col) || "";
     input.style.position = "absolute";
-    input.style.left = `${cellX + rect.left}px`;
-    input.style.top = `${cellY + rect.top}px`;
+    input.style.left = `${cellX - scrollLeft + rect.left}px`;
+    input.style.top = `${cellY - scrollTop + rect.top}px`;
     input.style.width = `${cellW - 2}px`;
     input.style.height = `${cellH - 2}px`;
+
     input.style.fontSize = "12px";
-    input.style.border = "1px solid #333";
+    input.style.border = "none";
+    input.style.outline = "none";
+    input.style.fontFamily = "Arial, sans-serif";
     input.style.padding = "0";
     input.style.margin = "0";
     input.style.zIndex = "1000";
+    input.style.boxSizing = "border-box";
 
     document.body.appendChild(input);
     input.focus();
@@ -64,6 +69,7 @@ export class CellEditor {
     const saveAndCleanup = () => {
       this.grid.setCellData(row, col, input.value);
       document.body.removeChild(input);
+      this.grid.redraw();
     };
 
     input.addEventListener("blur", saveAndCleanup);

@@ -1,93 +1,38 @@
-export class SelectionManager {
-    constructor() {
-        this.isMouseDown = false;
-        this.isDragging = false;
-        this.startRow = 0;
-        this.startCol = 0;
-        this.endRow = 0;
-        this.endCol = 0;
-        this.selection = null;
+export class SelectionManger {
+    constructor(canvas, grid) {
+        this.canvas = canvas;
+        this.grid = grid;
+        this.isDraggingColumn = false;
+        this.dragStartColHeader = -1;
+        this.dragEndColHeader = -1;
+        this.canvas.addEventListener("onMouseDown", this.handleMouseDown);
     }
-    /**
-     * Handles pointer down (mouse click or drag start)
-     */
-    handlePointerDown(x, y, colWidths, rowHeights) {
-        this.isMouseDown = true;
-        this.isDragging = true;
-        const col = this.getColFromX(x, colWidths);
-        const row = this.getRowFromY(y, rowHeights);
-        this.startCol = col;
-        this.startRow = row;
-        this.endCol = col;
-        this.endRow = row;
-        this.updateSelection();
-    }
-    /**
-     * Handles pointer move (dragging)
-     */
-    handlePointerMove(x, y, colWidths, rowHeights) {
-        if (!this.isMouseDown)
+    handleMouseDown(e) {
+        const rect = this.canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        const container = document.getElementById("container");
+        const scrollLeft = container.scrollLeft;
+        const scrollTop = container.scrollTop;
+        const headerHeight = this.grid.rowHeights[0];
+        const rowHeaderWidth = this.grid.colWidths[0];
+        if (y < headerHeight && x >= rowHeaderWidth) {
+            // Clicked in column header
+            const adjustedX = x + scrollLeft;
+            const col = this.grid.getColFromX(adjustedX);
+            if (col > 0) {
+                this.isDraggingColumn = true;
+                this.dragStartColHeader = col;
+                this.dragEndColHeader = col;
+                this.grid.selectedCells = {
+                    startRow: 1,
+                    endRow: this.grid.totalRows - 1,
+                    startCol: col,
+                    endCol: col
+                };
+                this.grid.redraw();
+            }
             return;
-        this.endCol = this.getColFromX(x, colWidths);
-        this.endRow = this.getRowFromY(y, rowHeights);
-        this.updateSelection();
-    }
-    /**
-     * Handles pointer up (mouse release)
-     */
-    handlePointerUp() {
-        this.isMouseDown = false;
-        this.isDragging = false;
-    }
-    /**
-     * Returns current selection bounds
-     */
-    getSelectionBounds() {
-        return this.selection;
-    }
-    /**
-     * Converts x pixel to column index
-     */
-    getColFromX(x, colWidths) {
-        let acc = 0;
-        for (let i = 0; i < colWidths.length; i++) {
-            acc += colWidths[i];
-            if (x < acc)
-                return i;
         }
-        return colWidths.length - 1;
-    }
-    /**
-     * Converts y pixel to row index
-     */
-    getRowFromY(y, rowHeights) {
-        let acc = 0;
-        for (let i = 0; i < rowHeights.length; i++) {
-            acc += rowHeights[i];
-            if (y < acc)
-                return i;
-        }
-        return rowHeights.length - 1;
-    }
-    /**
-     * Calculates the current selection bounds
-     */
-    updateSelection() {
-        const top = Math.min(this.startRow, this.endRow);
-        const bottom = Math.max(this.startRow, this.endRow);
-        const left = Math.min(this.startCol, this.endCol);
-        const right = Math.max(this.startCol, this.endCol);
-        this.selection = { top, bottom, left, right };
-    }
-    /**
-     * Used to support column header click to select whole column
-     */
-    selectEntireColumn(col, totalRows) {
-        this.selection = {
-            top: 1, // skip header row
-            bottom: totalRows - 1,
-            left: col,
-            right: col,
-        };
     }
 }

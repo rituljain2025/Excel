@@ -1,53 +1,3 @@
-// import { Grid } from './grid.js';
-
-// export class ResizeHandler {
-//   private isResizing = false;
-//   private startX = 0;
-//   private startWidth = 0;
-
-//   constructor(private canvas: HTMLCanvasElement, private grid: Grid) {
-//     this.canvas.addEventListener("mousedown", this.onMouseDown);
-//   }
-
-//   private onMouseDown = (e: MouseEvent) => {
-//     const rect = this.canvas.getBoundingClientRect();
-//     const x = e.clientX - rect.left;
-
-//     const colWidth = this.grid.getColWidth();
-//     const offset = x % colWidth;
-
-//     if (Math.abs(offset - colWidth) < 5) {
-//       this.isResizing = true;
-//       this.startX = x;
-//       this.startWidth = colWidth;
-//       document.body.style.cursor = "col-resize";
-
-//       window.addEventListener("mousemove", this.onMouseMove);
-//       window.addEventListener("mouseup", this.onMouseUp);
-//     }
-//   };
-
-//   private onMouseMove = (e: MouseEvent) => {
-//     if (!this.isResizing) return;
-
-//     const rect = this.canvas.getBoundingClientRect();
-//     const currentX = e.clientX - rect.left;
-//     const delta = currentX - this.startX;
-//     const newWidth = this.startWidth + delta;
-
-//     if (newWidth >= 30 && newWidth <= 500) {
-//       this.grid.setColWidth(newWidth);
-//     }
-//   };
-
-//   private onMouseUp = () => {
-//     this.isResizing = false;
-//     document.body.style.cursor = "default";
-//     window.removeEventListener("mousemove", this.onMouseMove);
-//     window.removeEventListener("mouseup", this.onMouseUp);
-//   };
-// }
-
 import { Grid } from './grid.js';
 
 export class ResizeHandler {
@@ -55,59 +5,163 @@ export class ResizeHandler {
   private startX = 0;
   private startWidth = 0;
   private resizingColIndex = -1;
+  private isHovering = false;
 
   constructor(private canvas: HTMLCanvasElement, private grid: Grid) {
     this.canvas.addEventListener("mousedown", this.onMouseDown);
+    this.canvas.addEventListener("mousemove", this.onMouseMove);
+    this.canvas.addEventListener("mouseleave", this.onMouseLeave);
+    
+    // // Set default cursor
+    // this.canvas.style.cursor = "cell";
+  }
+
+  private isInColumnHeader(y: number): boolean {
+    const headerHeight = this.grid.getRowHeight(0);
+    return y >= 0 && y <= headerHeight;
   }
 
   private onMouseDown = (e: MouseEvent) => {
     const rect = this.canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
 
-    let cumulativeX = 0;
+    // Only allow resizing if mouse is within the column header area
+    if (!this.isInColumnHeader(y)) {
+      console.log("Not in column header area");
+      return;
+    }
+
+    const container = document.getElementById("container")!;
+    const scrollLeft = container.scrollLeft;
+    let cumulativeX = -scrollLeft; // Account for horizontal scroll
 
     for (let col = 0; col < 500; col++) {
       const width = this.grid.getColWidth(col);
 
       // Check if mouse is within 5px of the right edge of this column
       if (Math.abs(x - (cumulativeX + width)) < 5) {
+        console.log("Starting resize for column:", col);
         this.isResizing = true;
         this.resizingColIndex = col;
         this.startX = x;
         this.startWidth = width;
 
-        document.body.style.cursor = "col-resize";
+        this.canvas.style.cursor = "col-resize";
+        // document.body.style.cursor = "col-resize";
 
-        window.addEventListener("mousemove", this.onMouseMove);
+        window.addEventListener("mousemove", this.onMouseMoveResize);
         window.addEventListener("mouseup", this.onMouseUp);
+        
+        // Prevent default to avoid interfering with other mouse handlers
+        e.preventDefault();
+        e.stopPropagation();
         return;
       }
 
       cumulativeX += width;
 
       // Stop checking if we've passed the visible area
-      if (cumulativeX > this.canvas.width) break;
+      if (cumulativeX > this.canvas.width + scrollLeft) break;
     }
   };
-
-  private onMouseMove = (e: MouseEvent) => {
+  
+  // Main for resize
+  private onMouseMoveResize = (e: MouseEvent) => {
     if (!this.isResizing || this.resizingColIndex === -1) return;
 
     const rect = this.canvas.getBoundingClientRect();
     const currentX = e.clientX - rect.left;
     const delta = currentX - this.startX;
     const newWidth = this.startWidth + delta;
+    this.grid.suppressNextHeaderClick();
+    console.log("Resizing column", this.resizingColIndex, "to width:", newWidth);
 
     if (newWidth >= 30 && newWidth <= 500) {
       this.grid.setColWidth(this.resizingColIndex, newWidth);
     }
   };
-
+  
+  // Called by mouseDown after resizing
   private onMouseUp = () => {
-    this.isResizing = false;
-    this.resizingColIndex = -1;
-    document.body.style.cursor = "default";
-    window.removeEventListener("mousemove", this.onMouseMove);
-    window.removeEventListener("mouseup", this.onMouseUp);
+    if (this.isResizing) {
+      console.log("Ending column resize");
+      this.isResizing = false;
+      this.resizingColIndex = -1;
+      
+      this.canvas.style.cursor = "default";
+      document.body.style.cursor = "default";
+      this.isHovering = false;
+      
+      window.removeEventListener("mousemove", this.onMouseMoveResize);
+      window.removeEventListener("mouseup", this.onMouseUp);
+    }
   };
+
+  private onMouseMove = (e: MouseEvent) => {
+    if (this.isResizing) return; // Don't change cursor while resizing
+
+    const rect = this.canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    // Only show resize cursor if mouse is within the column header area
+    if (!this.isInColumnHeader(y)) {
+      if (this.isHovering) {
+        this.canvas.style.cursor = "default";
+        this.isHovering = false;
+      }
+      return;
+    }
+
+    const container = document.getElementById("container")!;
+    const scrollLeft = container.scrollLeft;
+    let cumulativeX = -scrollLeft;
+    let foundResizeBorder = false;
+
+    for (let col = 0; col < 500; col++) {
+      const width = this.grid.getColWidth(col);
+    
+      // Check if mouse is within 5px of the right edge of this column
+      if (Math.abs(x - (cumulativeX + width)) < 5) {
+        this.grid.suppressNextHeaderClick();
+        this.canvas.style.cursor = "col-resize";
+        this.isHovering = true;
+        foundResizeBorder = true;
+        break;
+      }
+
+      cumulativeX += width;
+
+      // Stop checking if we've passed the visible area
+      if (cumulativeX > this.canvas.width + scrollLeft) break;
+    }
+
+    if (!foundResizeBorder && this.isHovering) {
+      this.canvas.style.cursor = "default";
+      this.isHovering = false;
+    }
+  };
+
+  private onMouseLeave = () => {
+    if (!this.isResizing && this.isHovering) {
+      this.canvas.style.cursor = "default";
+      this.isHovering = false;
+    }
+  };
+  
+  // Clean up method to remove event listeners
+  public destroy() {
+    this.canvas.removeEventListener("mousedown", this.onMouseDown);
+    this.canvas.removeEventListener("mousemove", this.onMouseMove);
+    this.canvas.removeEventListener("mouseleave", this.onMouseLeave);
+    
+    // Clean up any active resize operation
+    if (this.isResizing) {
+      window.removeEventListener("mousemove", this.onMouseMoveResize);
+      window.removeEventListener("mouseup", this.onMouseUp);
+      this.canvas.style.cursor = "default";
+      document.body.style.cursor = "default";
+    }
+  }
 }
