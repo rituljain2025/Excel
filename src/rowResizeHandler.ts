@@ -1,13 +1,15 @@
-import { Grid } from "./grid";
-
+import { ResizeRowCommand } from "./commands/ResizeRowCommand.js";
+import { Grid } from "./grid.js";
+import { UndoManager } from "./commands/UndoManager.js";
 export class RowResizeHandler {
   private isResizing = false;
   private startY = 0;
   private startHeight = 0;
   private targetRow = -1;
   private isHovering = false;
+  private currentRowHeight :number = 0;
 
-  constructor(private canvas: HTMLCanvasElement, private grid: Grid) {
+  constructor(private canvas: HTMLCanvasElement, private grid: Grid,private undoManager:UndoManager) {
     this.setupEventListeners();
   }
 
@@ -93,6 +95,7 @@ export class RowResizeHandler {
         this.startY = y;
         this.startHeight = rowHeight;
         this.targetRow = i;
+        this.currentRowHeight = rowHeight;
 
         this.canvas.style.cursor = "row-resize";
         // document.body.style.cursor = "row-resize";
@@ -178,17 +181,28 @@ export class RowResizeHandler {
     // Apply constraints for minimum and maximum row height
     if (newHeight >= 20 && newHeight <= 200) {
       this.grid.setRowHeight(this.targetRow, newHeight);
+      this.currentRowHeight = newHeight;
     }
   };
 
   private onMouseUp = () => {
     if (this.isResizing) {
+      if (this.startHeight !== this.currentRowHeight) {
+        console.log(`Committing ResizeRowCommand from ${this.startHeight} to ${this.currentRowHeight}`);
+        const cmd = new ResizeRowCommand(
+          this.grid,
+          this.startHeight,
+          this.currentRowHeight,
+          this.targetRow
+        );
+        this.undoManager.executeCommand(cmd);
+      }
+
       console.log("Ending resize");
       this.isResizing = false;
       this.targetRow = -1;
-      
+      this.currentRowHeight = 0;
       this.canvas.style.cursor = "default";
-      // document.body.style.cursor = "default";
       this.isHovering = false;
       
       // Remove global mouse events

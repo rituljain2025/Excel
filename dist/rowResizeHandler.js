@@ -1,12 +1,15 @@
+import { ResizeRowCommand } from "./commands/ResizeRowCommand.js";
 export class RowResizeHandler {
-    constructor(canvas, grid) {
+    constructor(canvas, grid, undoManager) {
         this.canvas = canvas;
         this.grid = grid;
+        this.undoManager = undoManager;
         this.isResizing = false;
         this.startY = 0;
         this.startHeight = 0;
         this.targetRow = -1;
         this.isHovering = false;
+        this.currentRowHeight = 0;
         this.onMouseDown = (e) => {
             const rect = this.canvas.getBoundingClientRect();
             const x = e.clientX - rect.left;
@@ -39,6 +42,7 @@ export class RowResizeHandler {
                     this.startY = y;
                     this.startHeight = rowHeight;
                     this.targetRow = i;
+                    this.currentRowHeight = rowHeight;
                     this.canvas.style.cursor = "row-resize";
                     // document.body.style.cursor = "row-resize";
                     // Add global mouse events for resizing
@@ -109,15 +113,21 @@ export class RowResizeHandler {
             // Apply constraints for minimum and maximum row height
             if (newHeight >= 20 && newHeight <= 200) {
                 this.grid.setRowHeight(this.targetRow, newHeight);
+                this.currentRowHeight = newHeight;
             }
         };
         this.onMouseUp = () => {
             if (this.isResizing) {
+                if (this.startHeight !== this.currentRowHeight) {
+                    console.log(`Committing ResizeRowCommand from ${this.startHeight} to ${this.currentRowHeight}`);
+                    const cmd = new ResizeRowCommand(this.grid, this.startHeight, this.currentRowHeight, this.targetRow);
+                    this.undoManager.executeCommand(cmd);
+                }
                 console.log("Ending resize");
                 this.isResizing = false;
                 this.targetRow = -1;
+                this.currentRowHeight = 0;
                 this.canvas.style.cursor = "default";
-                // document.body.style.cursor = "default";
                 this.isHovering = false;
                 // Remove global mouse events
                 document.removeEventListener("mousemove", this.onMouseMoveResize);

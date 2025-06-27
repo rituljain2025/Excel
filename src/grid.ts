@@ -1,7 +1,7 @@
 
 export class Grid {
   private selectedColumn: number | null = null;
-  private selectedRow: number | null = null;
+  public selectedRow: number | null = null;
   
   // Cell range selection properties
   private selectedCells: {
@@ -25,6 +25,8 @@ export class Grid {
   public totalCols: number = 5000;
   private cellData: Map<number, Map<number, string>> = new Map();
   private lastRowHeaderWidth: number = 0;
+  private cellStyleData: Map<number, Map<number, { bold?: boolean; italic?: boolean }>> = new Map();
+
   constructor(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement) {
     this.ctx = ctx;
     this.canvas = canvas;
@@ -206,7 +208,7 @@ export class Grid {
 
     const headerHeight = this.rowHeights[0];
     const rowHeaderWidth = this.colWidths[0];
-
+    
     // Only handle cell selection in data area
     if (x >= rowHeaderWidth && y >= headerHeight) {
       const { row, col } = this.getCellFromCoordinates(x, y);
@@ -307,6 +309,8 @@ export class Grid {
       const adjustedY = y + scrollTop;
       const row = this.getRowFromY(adjustedY);
       this.selectedRow = (row > 0) ? row : null;
+   
+      
       this.redraw();
     } else if (x < rowHeaderWidth && y < headerHeight) {
       // Clicked in corner - clear all selections
@@ -317,7 +321,7 @@ export class Grid {
     }
     // If clicked in data area, cell selection is already handled by mousedown/drag
   }
-
+ 
   public getColWidth(index: number): number {
     return this.colWidths[index];
   }
@@ -413,7 +417,7 @@ export class Grid {
     let startRow = 0, endRow = 0;
     for (let i = 0; i < this.totalRows; i++) {
       const h = this.rowHeights[i];
-      if (y + h >= scrollTop && startRow === 0) startRow = i;
+      if (y + h >= scrollTop && startRow === 0 ) startRow = i;
       if (y >= scrollTop + viewHeight) {
         endRow = i;
         break;
@@ -428,7 +432,7 @@ export class Grid {
     let startCol = 0, endCol = 0;
     for (let j = 0; j < this.totalCols; j++) {
       const width = this.colWidths[j];
-      if (x + width >= scrollLeft && startCol === 0) startCol = j;
+      if (x + width >= scrollLeft && startCol === 0 ) startCol = j;
       if (x >= scrollLeft + viewWidth) {
         endCol = j;
         break;
@@ -476,8 +480,13 @@ export class Grid {
         const rowData = this.cellData.get(i);
         const text = rowData?.get(j);
         if (text) {
+          const style = this.getCellStyle(i, j);
+          this.ctx.font = `${style?.italic ? "italic " : ""}${style?.bold ? "bold " : ""}12px Arial`;
           this.ctx.fillStyle = "black";
           this.ctx.fillText(text, colX + colW / 2, rowY + rowH / 2);
+
+          // this.ctx.fillStyle = "black";
+          // this.ctx.fillText(text, colX + colW / 2, rowY + rowH / 2);
         }
       }
     }
@@ -578,7 +587,7 @@ export class Grid {
       const rowHeight = this.rowHeights[rowIndex];
       const leftX = 0;
       const rightX = this.canvas.width / this.dpr;
-
+      
       this.ctx.strokeStyle = "#137e41";
       this.ctx.lineWidth = 2 / this.dpr;
       this.drawCrispRect(leftX, rowY, rightX, rowHeight);
@@ -649,7 +658,7 @@ export class Grid {
   }
   
   public loadJsonData(data: Array<Object>): void {
- 
+    this.cellData.clear();
     this.totalRows = data.length + 1; // +1 for header
     
     // Header
@@ -663,6 +672,7 @@ export class Grid {
     data.forEach((item, rowIndex) => {
       const actualRow = rowIndex + 2;
       Object.keys(item).forEach((key, i) => {
+      
         this.setCellData(actualRow, i + 1, item[key as keyof typeof item].toString());
       });
     });
@@ -706,8 +716,121 @@ export class Grid {
     
     return Math.max(60, Math.ceil(maxWidth)); // minimum 60px
   }
+  public insertRow(index: number): void {
+    const newCellData = new Map<number, Map<number, string>>();
 
- 
-}
+    for (let [row, cols] of this.cellData) {
+      const rowNum = Number(row);
+      newCellData.set(rowNum >= index ? rowNum + 1 : rowNum, new Map(cols));
+    }
+
+    this.cellData = newCellData;
+    this.totalRows++;
+  }
+
+  public removeRow(index: number): void {
+    const newCellData = new Map<number, Map<number, string>>();
+
+    for (let [row, cols] of this.cellData) {
+      const rowNum = Number(row);
+      if (rowNum === index) continue;
+      newCellData.set(rowNum > index ? rowNum - 1 : rowNum, new Map(cols));
+    }
+
+    this.cellData = newCellData;
+    this.totalRows--;
+  }
+
+  public cloneRowData(index: number): Map<number, string> {
+    const rowData = this.cellData.get(index) || new Map();
+    return new Map(rowData);
+  }
+
+  public restoreRowData(index: number, rowData: Map<number, string>): void {
+    this.cellData.set(index, new Map(rowData));
+  }
+  public getSelectedRow(): number | null {
+    return this.selectedRow;
+  }
+  public setSelectedRow(row: number | null): void {
+    console.log("selected " +row);
+    
+    this.selectedRow = row;
+  }
+  public insertColumn(index: number): void {
+    for (const [row, cols] of this.cellData.entries()) {
+      const newCols = new Map<number, string>();
+      for (const [col, value] of cols.entries()) {
+        const newCol = col >= index ? col + 1 : col;
+        newCols.set(newCol, value);
+      }
+      this.cellData.set(row, newCols);
+    }
+    this.totalCols++;
+  }
+
+  public removeColumn(index: number): void {
+    for (const [row, cols] of this.cellData.entries()) {
+      const newCols = new Map<number, string>();
+      for (const [col, value] of cols.entries()) {
+        if (col === index) continue;
+        const newCol = col > index ? col - 1 : col;
+        newCols.set(newCol, value);
+      }
+      this.cellData.set(row, newCols);
+    }
+    this.totalCols--;
+  }
+  public cloneColumnData(index: number): Map<number, string> {
+    const colData = new Map<number, string>();
+    for (const [row, cols] of this.cellData.entries()) {
+      if (cols.has(index)) {
+        colData.set(row, cols.get(index)!);
+      }
+    }
+    return colData;
+  }
+  public restoreColumnData(index: number, colData: Map<number, string>): void {
+    for (const [row, value] of colData.entries()) {
+      if (!this.cellData.has(row)) {
+        this.cellData.set(row, new Map());
+      }
+      this.cellData.get(row)!.set(index, value);
+    }
+  }
+  public getSelectedColumn(): number | null {
+    return this.selectedColumn;
+  }
+  public setSelectedColumn(index:number | null){
+    this.selectedColumn = index;
+  }
+  public setCellStyle(row: number, col: number, style: { bold?: boolean; italic?: boolean }): void {
+    if (!this.cellStyleData.has(row)) {
+      this.cellStyleData.set(row, new Map());
+    }
+    const rowMap = this.cellStyleData.get(row)!;
+    const existing = rowMap.get(col) || {};
+    rowMap.set(col, { ...existing, ...style }); // Merge style
+  }
+
+  public getCellStyle(row: number, col: number): { bold?: boolean; italic?: boolean } | undefined {
+    return this.cellStyleData.get(row)?.get(col);
+  }
+  public getSelectedCell(): { row: number; col: number } | null {
+    if (
+      this.selectedCells &&
+      this.selectedCells.startRow === this.selectedCells.endRow &&
+      this.selectedCells.startCol === this.selectedCells.endCol
+    ) {
+      return {
+        row: this.selectedCells.startRow,
+        col: this.selectedCells.startCol,
+      };
+    }
+    return null;
+  }
+
+
+} 
 
 

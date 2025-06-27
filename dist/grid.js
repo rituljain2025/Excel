@@ -14,6 +14,7 @@ export class Grid {
         this.totalCols = 5000;
         this.cellData = new Map();
         this.lastRowHeaderWidth = 0;
+        this.cellStyleData = new Map();
         this.ctx = ctx;
         this.canvas = canvas;
         this.dpr = window.devicePixelRatio || 1;
@@ -379,8 +380,12 @@ export class Grid {
                 const rowData = this.cellData.get(i);
                 const text = rowData?.get(j);
                 if (text) {
+                    const style = this.getCellStyle(i, j);
+                    this.ctx.font = `${style?.italic ? "italic " : ""}${style?.bold ? "bold " : ""}12px Arial`;
                     this.ctx.fillStyle = "black";
                     this.ctx.fillText(text, colX + colW / 2, rowY + rowH / 2);
+                    // this.ctx.fillStyle = "black";
+                    // this.ctx.fillText(text, colX + colW / 2, rowY + rowH / 2);
                 }
             }
         }
@@ -513,6 +518,7 @@ export class Grid {
         this.drawCrispRect(startX + 1, startY + 1, width - 2, height - 2);
     }
     loadJsonData(data) {
+        this.cellData.clear();
         this.totalRows = data.length + 1; // +1 for header
         // Header
         const headers = Object.keys(data[0]);
@@ -560,5 +566,108 @@ export class Grid {
             maxWidth = Math.max(maxWidth, textMetrics.width + 16); // 16px padding
         }
         return Math.max(60, Math.ceil(maxWidth)); // minimum 60px
+    }
+    insertRow(index) {
+        const newCellData = new Map();
+        for (let [row, cols] of this.cellData) {
+            const rowNum = Number(row);
+            newCellData.set(rowNum >= index ? rowNum + 1 : rowNum, new Map(cols));
+        }
+        this.cellData = newCellData;
+        this.totalRows++;
+    }
+    removeRow(index) {
+        const newCellData = new Map();
+        for (let [row, cols] of this.cellData) {
+            const rowNum = Number(row);
+            if (rowNum === index)
+                continue;
+            newCellData.set(rowNum > index ? rowNum - 1 : rowNum, new Map(cols));
+        }
+        this.cellData = newCellData;
+        this.totalRows--;
+    }
+    cloneRowData(index) {
+        const rowData = this.cellData.get(index) || new Map();
+        return new Map(rowData);
+    }
+    restoreRowData(index, rowData) {
+        this.cellData.set(index, new Map(rowData));
+    }
+    getSelectedRow() {
+        return this.selectedRow;
+    }
+    setSelectedRow(row) {
+        console.log("selected " + row);
+        this.selectedRow = row;
+    }
+    insertColumn(index) {
+        for (const [row, cols] of this.cellData.entries()) {
+            const newCols = new Map();
+            for (const [col, value] of cols.entries()) {
+                const newCol = col >= index ? col + 1 : col;
+                newCols.set(newCol, value);
+            }
+            this.cellData.set(row, newCols);
+        }
+        this.totalCols++;
+    }
+    removeColumn(index) {
+        for (const [row, cols] of this.cellData.entries()) {
+            const newCols = new Map();
+            for (const [col, value] of cols.entries()) {
+                if (col === index)
+                    continue;
+                const newCol = col > index ? col - 1 : col;
+                newCols.set(newCol, value);
+            }
+            this.cellData.set(row, newCols);
+        }
+        this.totalCols--;
+    }
+    cloneColumnData(index) {
+        const colData = new Map();
+        for (const [row, cols] of this.cellData.entries()) {
+            if (cols.has(index)) {
+                colData.set(row, cols.get(index));
+            }
+        }
+        return colData;
+    }
+    restoreColumnData(index, colData) {
+        for (const [row, value] of colData.entries()) {
+            if (!this.cellData.has(row)) {
+                this.cellData.set(row, new Map());
+            }
+            this.cellData.get(row).set(index, value);
+        }
+    }
+    getSelectedColumn() {
+        return this.selectedColumn;
+    }
+    setSelectedColumn(index) {
+        this.selectedColumn = index;
+    }
+    setCellStyle(row, col, style) {
+        if (!this.cellStyleData.has(row)) {
+            this.cellStyleData.set(row, new Map());
+        }
+        const rowMap = this.cellStyleData.get(row);
+        const existing = rowMap.get(col) || {};
+        rowMap.set(col, { ...existing, ...style }); // Merge style
+    }
+    getCellStyle(row, col) {
+        return this.cellStyleData.get(row)?.get(col);
+    }
+    getSelectedCell() {
+        if (this.selectedCells &&
+            this.selectedCells.startRow === this.selectedCells.endRow &&
+            this.selectedCells.startCol === this.selectedCells.endCol) {
+            return {
+                row: this.selectedCells.startRow,
+                col: this.selectedCells.startCol,
+            };
+        }
+        return null;
     }
 }

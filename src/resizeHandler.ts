@@ -1,4 +1,6 @@
+import { UndoManager } from './commands/UndoManager.js';
 import { Grid } from './grid.js';
+import { ResizeColumnCommand } from './commands/ResizeColumnCommand.js';
 
 export class ResizeHandler {
   private isResizing = false;
@@ -6,8 +8,9 @@ export class ResizeHandler {
   private startWidth = 0;
   private resizingColIndex = -1;
   private isHovering = false;
+  private currentNewWidth: number = 0; // Track width during resizing
 
-  constructor(private canvas: HTMLCanvasElement, private grid: Grid) {
+  constructor(private canvas: HTMLCanvasElement, private grid: Grid,private undoManager:UndoManager) {
     this.canvas.addEventListener("mousedown", this.onMouseDown);
     this.canvas.addEventListener("mousemove", this.onMouseMove);
     this.canvas.addEventListener("mouseleave", this.onMouseLeave);
@@ -76,9 +79,11 @@ export class ResizeHandler {
     const newWidth = this.startWidth + delta;
     this.grid.suppressNextHeaderClick();
     console.log("Resizing column", this.resizingColIndex, "to width:", newWidth);
-
+    
+    
     if (newWidth >= 30 && newWidth <= 500) {
       this.grid.setColWidth(this.resizingColIndex, newWidth);
+      this.currentNewWidth = newWidth; // Track final width for undo
     }
   };
   
@@ -86,9 +91,32 @@ export class ResizeHandler {
   private onMouseUp = () => {
     if (this.isResizing) {
       console.log("Ending column resize");
+      
+      // Store values before resetting
+      const colIndex = this.resizingColIndex;
+      const oldWidth = this.startWidth;
+      const newWidth = this.currentNewWidth;
+      
+      // Reset state
       this.isResizing = false;
       this.resizingColIndex = -1;
+      this.currentNewWidth = 0;
       
+      // Create undo command if width actually changed
+      if (oldWidth !== newWidth && newWidth >= 30 && newWidth <= 500) {
+        console.log(`Creating resize command for column ${colIndex}: ${oldWidth} -> ${newWidth}`);
+        
+        // Reset to original width first, then execute command
+        this.grid.setColWidth(colIndex, oldWidth);
+        
+        const cmd = new ResizeColumnCommand(
+          this.grid,
+          colIndex,
+          newWidth
+        );
+        this.undoManager.executeCommand(cmd);
+      }
+
       this.canvas.style.cursor = "default";
       document.body.style.cursor = "default";
       this.isHovering = false;

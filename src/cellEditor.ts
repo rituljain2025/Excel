@@ -1,7 +1,8 @@
 import { Grid } from "./grid";
-
+import { EditCellCommand } from "./commands/EditCellCommand.js";
+import { UndoManager } from "./commands/UndoManager.js";
 export class CellEditor {
-  constructor(private canvas: HTMLCanvasElement, private grid: Grid) {
+  constructor(private canvas: HTMLCanvasElement, private grid: Grid,private undoManager:UndoManager) {
     this.canvas.addEventListener("dblclick", this.onDoubleClick);
   }
 
@@ -65,12 +66,25 @@ export class CellEditor {
 
     document.body.appendChild(input);
     input.focus();
-
+    
     const saveAndCleanup = () => {
-      this.grid.setCellData(row, col, input.value);
+      const newValue = input.value;
+      const oldValue = this.grid.getCellData(row, col) || "";
+
+      if (newValue !== oldValue) {
+        const cmd = new EditCellCommand(this.grid, row, col, oldValue, newValue);
+        this.undoManager.executeCommand(cmd);
+      }
+
       document.body.removeChild(input);
       this.grid.redraw();
     };
+
+    // const saveAndCleanup = () => {
+    //   this.grid.setCellData(row, col, input.value);
+    //   document.body.removeChild(input);
+    //   this.grid.redraw();
+    // };
 
     input.addEventListener("blur", saveAndCleanup);
     input.addEventListener("keydown", (event) => {

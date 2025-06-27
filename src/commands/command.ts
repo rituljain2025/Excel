@@ -1,0 +1,5 @@
+// command.ts
+export interface Command {
+  execute(): void;
+  undo(): void;
+}

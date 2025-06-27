@@ -1,12 +1,15 @@
+import { ResizeColumnCommand } from './commands/ResizeColumnCommand.js';
 export class ResizeHandler {
-    constructor(canvas, grid) {
+    constructor(canvas, grid, undoManager) {
         this.canvas = canvas;
         this.grid = grid;
+        this.undoManager = undoManager;
         this.isResizing = false;
         this.startX = 0;
         this.startWidth = 0;
         this.resizingColIndex = -1;
         this.isHovering = false;
+        this.currentNewWidth = 0; // Track width during resizing
         this.onMouseDown = (e) => {
             const rect = this.canvas.getBoundingClientRect();
             const x = e.clientX - rect.left;
@@ -55,14 +58,29 @@ export class ResizeHandler {
             console.log("Resizing column", this.resizingColIndex, "to width:", newWidth);
             if (newWidth >= 30 && newWidth <= 500) {
                 this.grid.setColWidth(this.resizingColIndex, newWidth);
+                this.currentNewWidth = newWidth; // Track final width for undo
             }
         };
         // Called by mouseDown after resizing
         this.onMouseUp = () => {
             if (this.isResizing) {
                 console.log("Ending column resize");
+                // Store values before resetting
+                const colIndex = this.resizingColIndex;
+                const oldWidth = this.startWidth;
+                const newWidth = this.currentNewWidth;
+                // Reset state
                 this.isResizing = false;
                 this.resizingColIndex = -1;
+                this.currentNewWidth = 0;
+                // Create undo command if width actually changed
+                if (oldWidth !== newWidth && newWidth >= 30 && newWidth <= 500) {
+                    console.log(`Creating resize command for column ${colIndex}: ${oldWidth} -> ${newWidth}`);
+                    // Reset to original width first, then execute command
+                    this.grid.setColWidth(colIndex, oldWidth);
+                    const cmd = new ResizeColumnCommand(this.grid, colIndex, newWidth);
+                    this.undoManager.executeCommand(cmd);
+                }
                 this.canvas.style.cursor = "default";
                 document.body.style.cursor = "default";
                 this.isHovering = false;
