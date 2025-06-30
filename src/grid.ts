@@ -1,4 +1,4 @@
-
+import { FormulaEvaluator } from "./FormulaEvaluator.js";
 export class Grid {
   private selectedColumn: number | null = null;
   public selectedRow: number | null = null;
@@ -265,7 +265,6 @@ export class Grid {
     if (this.isDragging) {
       this.isDragging = false;
       // Selection should persist after drag ends
-      console.log("Selection completed:", this.selectedCells);
     }
   }
 
@@ -441,7 +440,6 @@ export class Grid {
     }
     if (endCol === 0) endCol = this.totalCols;
 
-
     this.ctx.font = "12px Arial";
     this.ctx.textAlign = "center";
     this.ctx.textBaseline = "middle";
@@ -481,13 +479,15 @@ export class Grid {
         const text = rowData?.get(j);
         if (text) {
           const style = this.getCellStyle(i, j);
+          const displayText = text.startsWith("=")
+            ? this.formulaEvaluator.evaluate(text.substring(1))
+            : text;
+
           this.ctx.font = `${style?.italic ? "italic " : ""}${style?.bold ? "bold " : ""}12px Arial`;
           this.ctx.fillStyle = "black";
-          this.ctx.fillText(text, colX + colW / 2, rowY + rowH / 2);
-
-          // this.ctx.fillStyle = "black";
-          // this.ctx.fillText(text, colX + colW / 2, rowY + rowH / 2);
+          this.ctx.fillText(displayText, colX + colW / 2, rowY + rowH / 2);
         }
+
       }
     }
     
@@ -510,9 +510,7 @@ export class Grid {
       const rowH = this.rowHeights[i];
       const isSelectedRow = this.selectedRow === i;
       const isInSelection = this.selectedCells && i >= this.selectedCells.startRow && i <= this.selectedCells.endRow;
-      
-      
-    
+
       const colWidth = this.colWidths[0];
       this.ctx.fillStyle = (isSelectedRow || isInSelection) ? "#137e41" : "#f0f0f0";
       this.ctx.fillRect(0, rowY, colWidth, rowH);
@@ -540,6 +538,7 @@ export class Grid {
       const isInSelection = this.selectedCells && j >= this.selectedCells.startCol && j <= this.selectedCells.endCol;
 
       this.ctx.fillStyle = (isSelectedColumn || isInSelection) ? "#137e41" : "#f0f0f0";
+
       this.ctx.fillRect(colX, 0, colW, headerHeight);
      
       // Borders
@@ -753,8 +752,6 @@ export class Grid {
     return this.selectedRow;
   }
   public setSelectedRow(row: number | null): void {
-    console.log("selected " +row);
-    
     this.selectedRow = row;
   }
   public insertColumn(index: number): void {
@@ -770,6 +767,7 @@ export class Grid {
   }
 
   public removeColumn(index: number): void {
+
     for (const [row, cols] of this.cellData.entries()) {
       const newCols = new Map<number, string>();
       for (const [col, value] of cols.entries()) {
@@ -781,6 +779,7 @@ export class Grid {
     }
     this.totalCols--;
   }
+  
   public cloneColumnData(index: number): Map<number, string> {
     const colData = new Map<number, string>();
     for (const [row, cols] of this.cellData.entries()) {
@@ -829,8 +828,10 @@ export class Grid {
     }
     return null;
   }
-
-
+  private formulaEvaluator = new FormulaEvaluator((row, col) => {
+   
+    return this.cellData.get(row)?.get(col);
+  });
 } 
 
 

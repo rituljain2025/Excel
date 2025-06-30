@@ -2,74 +2,81 @@ import { UndoManager } from './commands/UndoManager.js';
 import { Grid } from './grid.js';
 import { ResizeColumnCommand } from './commands/ResizeColumnCommand.js';
 
+/**
+ * Handles resizing of columns in the grid when the user drags near column edges.
+ */
 export class ResizeHandler {
+  /** Whether a resize operation is in progress */
   private isResizing = false;
+  /** X-coordinate where resize started */
   private startX = 0;
+  /** Original width of the column before resizing */
   private startWidth = 0;
+  /** Index of the column being resized */
   private resizingColIndex = -1;
+  /** Whether mouse is hovering near a resizable border */
   private isHovering = false;
-  private currentNewWidth: number = 0; // Track width during resizing
+  /** Final width during active resize drag (used for undo command) */
+  private currentNewWidth: number = 0;
 
-  constructor(private canvas: HTMLCanvasElement, private grid: Grid,private undoManager:UndoManager) {
+  /**
+   * @param canvas HTML canvas where the grid is drawn
+   * @param grid Grid instance to manipulate column widths
+   * @param undoManager UndoManager to support undo/redo functionality
+   */
+  constructor(private canvas: HTMLCanvasElement, private grid: Grid, private undoManager: UndoManager) {
     this.canvas.addEventListener("mousedown", this.onMouseDown);
     this.canvas.addEventListener("mousemove", this.onMouseMove);
     this.canvas.addEventListener("mouseleave", this.onMouseLeave);
-    
-    // // Set default cursor
-    // this.canvas.style.cursor = "cell";
   }
 
+  /**
+   * Checks if the y-position is within the column header area
+   */
   private isInColumnHeader(y: number): boolean {
     const headerHeight = this.grid.getRowHeight(0);
     return y >= 0 && y <= headerHeight;
   }
 
+  /**
+   * Handles mouse down event to initiate resizing if user clicks near column edge
+   */
   private onMouseDown = (e: MouseEvent) => {
     const rect = this.canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
 
-    // Only allow resizing if mouse is within the column header area
-    if (!this.isInColumnHeader(y)) {
-      console.log("Not in column header area");
-      return;
-    }
+    if (!this.isInColumnHeader(y)) return;
 
     const container = document.getElementById("container")!;
     const scrollLeft = container.scrollLeft;
-    let cumulativeX = -scrollLeft; // Account for horizontal scroll
+    let cumulativeX = -scrollLeft;
 
     for (let col = 0; col < 500; col++) {
       const width = this.grid.getColWidth(col);
 
-      // Check if mouse is within 5px of the right edge of this column
       if (Math.abs(x - (cumulativeX + width)) < 5) {
-        console.log("Starting resize for column:", col);
         this.isResizing = true;
         this.resizingColIndex = col;
         this.startX = x;
         this.startWidth = width;
-
         this.canvas.style.cursor = "col-resize";
-        // document.body.style.cursor = "col-resize";
 
         window.addEventListener("mousemove", this.onMouseMoveResize);
         window.addEventListener("mouseup", this.onMouseUp);
-        
-        // Prevent default to avoid interfering with other mouse handlers
         e.preventDefault();
         e.stopPropagation();
         return;
       }
 
       cumulativeX += width;
-
-      // Stop checking if we've passed the visible area
       if (cumulativeX > this.canvas.width + scrollLeft) break;
     }
   };
-  
-  // Main for resize
+
+  /**
+   * Handles active resizing as user drags the mouse
+   */
   private onMouseMoveResize = (e: MouseEvent) => {
     if (!this.isResizing || this.resizingColIndex === -1) return;
 
@@ -77,63 +84,54 @@ export class ResizeHandler {
     const currentX = e.clientX - rect.left;
     const delta = currentX - this.startX;
     const newWidth = this.startWidth + delta;
-    this.grid.suppressNextHeaderClick();
-    console.log("Resizing column", this.resizingColIndex, "to width:", newWidth);
-    
-    
+
+    this.grid.suppressNextHeaderClick(); // Prevent selection conflict
+
     if (newWidth >= 30 && newWidth <= 500) {
       this.grid.setColWidth(this.resizingColIndex, newWidth);
-      this.currentNewWidth = newWidth; // Track final width for undo
+      this.currentNewWidth = newWidth;
     }
   };
-  
-  // Called by mouseDown after resizing
+
+  /**
+   * Ends the resize operation and registers undo command
+   */
   private onMouseUp = () => {
     if (this.isResizing) {
-      console.log("Ending column resize");
-      
-      // Store values before resetting
       const colIndex = this.resizingColIndex;
       const oldWidth = this.startWidth;
       const newWidth = this.currentNewWidth;
-      
-      // Reset state
+
       this.isResizing = false;
       this.resizingColIndex = -1;
       this.currentNewWidth = 0;
-      
-      // Create undo command if width actually changed
+
       if (oldWidth !== newWidth && newWidth >= 30 && newWidth <= 500) {
-        console.log(`Creating resize command for column ${colIndex}: ${oldWidth} -> ${newWidth}`);
-        
-        // Reset to original width first, then execute command
-        this.grid.setColWidth(colIndex, oldWidth);
-        
-        const cmd = new ResizeColumnCommand(
-          this.grid,
-          colIndex,
-          newWidth
-        );
+        this.grid.setColWidth(colIndex, oldWidth); // reset for undo consistency
+
+        const cmd = new ResizeColumnCommand(this.grid, colIndex, newWidth);
         this.undoManager.executeCommand(cmd);
       }
 
       this.canvas.style.cursor = "default";
       document.body.style.cursor = "default";
       this.isHovering = false;
-      
+
       window.removeEventListener("mousemove", this.onMouseMoveResize);
       window.removeEventListener("mouseup", this.onMouseUp);
     }
   };
 
+  /**
+   * Handles normal mouse movement to show resize cursor near column edges
+   */
   private onMouseMove = (e: MouseEvent) => {
-    if (this.isResizing) return; // Don't change cursor while resizing
+    if (this.isResizing) return;
 
     const rect = this.canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
 
-    // Only show resize cursor if mouse is within the column header area
     if (!this.isInColumnHeader(y)) {
       if (this.isHovering) {
         this.canvas.style.cursor = "default";
@@ -149,8 +147,7 @@ export class ResizeHandler {
 
     for (let col = 0; col < 500; col++) {
       const width = this.grid.getColWidth(col);
-    
-      // Check if mouse is within 5px of the right edge of this column
+
       if (Math.abs(x - (cumulativeX + width)) < 5) {
         this.grid.suppressNextHeaderClick();
         this.canvas.style.cursor = "col-resize";
@@ -160,8 +157,6 @@ export class ResizeHandler {
       }
 
       cumulativeX += width;
-
-      // Stop checking if we've passed the visible area
       if (cumulativeX > this.canvas.width + scrollLeft) break;
     }
 
@@ -171,20 +166,24 @@ export class ResizeHandler {
     }
   };
 
+  /**
+   * Resets the cursor when the mouse leaves the canvas
+   */
   private onMouseLeave = () => {
     if (!this.isResizing && this.isHovering) {
       this.canvas.style.cursor = "default";
       this.isHovering = false;
     }
   };
-  
-  // Clean up method to remove event listeners
+
+  /**
+   * Cleans up all event listeners and state
+   */
   public destroy() {
     this.canvas.removeEventListener("mousedown", this.onMouseDown);
     this.canvas.removeEventListener("mousemove", this.onMouseMove);
     this.canvas.removeEventListener("mouseleave", this.onMouseLeave);
-    
-    // Clean up any active resize operation
+
     if (this.isResizing) {
       window.removeEventListener("mousemove", this.onMouseMoveResize);
       window.removeEventListener("mouseup", this.onMouseUp);

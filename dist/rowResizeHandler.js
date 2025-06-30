@@ -1,71 +1,75 @@
 import { ResizeRowCommand } from "./commands/ResizeRowCommand.js";
+/**
+ * Handles mouse-based row resizing functionality in the grid.
+ */
 export class RowResizeHandler {
+    /**
+     * @param canvas The canvas element used for rendering the grid
+     * @param grid The Grid instance for cell data and rendering
+     * @param undoManager The UndoManager to support undo-redo of row resizing
+     */
     constructor(canvas, grid, undoManager) {
         this.canvas = canvas;
         this.grid = grid;
         this.undoManager = undoManager;
+        /** Whether the user is actively resizing a row */
         this.isResizing = false;
+        /** Y position where resizing started */
         this.startY = 0;
+        /** Initial height of the row before resize started */
         this.startHeight = 0;
+        /** Index of the row currently being resized */
         this.targetRow = -1;
+        /** Whether the mouse is currently hovering near a row border */
         this.isHovering = false;
+        /** Tracks the final height of the row being resized */
         this.currentRowHeight = 0;
+        /**
+         * Triggered on mouse down — starts resizing if near row border in header area
+         */
         this.onMouseDown = (e) => {
             const rect = this.canvas.getBoundingClientRect();
             const x = e.clientX - rect.left;
             const y = e.clientY - rect.top;
             const container = document.getElementById("container");
             const scrollTop = container.scrollTop;
-            // Get the row header width (first column width)
             const rowHeaderWidth = this.grid.getColWidth(0);
-            console.log("Mouse down at:", x, y, "Row header width:", rowHeaderWidth, "ScrollTop:", scrollTop);
-            // Only allow resizing if mouse is within the row header area
-            if (x >= rowHeaderWidth) {
-                console.log("Not in row header area");
-                return; // Not in row header area, exit early
-            }
-            // Get visible row range for performance optimization
+            // Only allow resizing in the row header area
+            if (x >= rowHeaderWidth)
+                return;
             const { start, end } = this.getVisibleRowRange(scrollTop);
-            // Check if we're near a row border within the visible row range
-            // We need to check in reverse order to prioritize the row whose bottom border we're actually near
             for (let i = start; i < end; i++) {
                 const rowTop = this.grid.getRowY(i);
                 const rowHeight = this.grid.getRowHeight(i);
                 const relativeY = rowTop - scrollTop;
                 const rowBottom = relativeY + rowHeight;
-                console.log(`Row ${i}: absoluteTop=${rowTop}, relativeTop=${relativeY}, height=${rowHeight}, bottom=${rowBottom}, mouse=${y}`);
-                // Check if mouse is near the bottom border of this row (within 5 pixels)
-                // We're looking for the row whose bottom border we're near, so we resize that row
                 if (y >= rowBottom - 5 && y <= rowBottom + 5) {
-                    console.log("Starting resize for row:", i, "at bottom border");
                     this.isResizing = true;
                     this.startY = y;
                     this.startHeight = rowHeight;
                     this.targetRow = i;
                     this.currentRowHeight = rowHeight;
                     this.canvas.style.cursor = "row-resize";
-                    // document.body.style.cursor = "row-resize";
-                    // Add global mouse events for resizing
                     document.addEventListener("mousemove", this.onMouseMoveResize);
                     document.addEventListener("mouseup", this.onMouseUp);
-                    // Prevent default to avoid interfering with other mouse handlers
                     e.preventDefault();
                     e.stopPropagation();
-                    return; // Exit immediately after finding the correct row
+                    return;
                 }
             }
         };
+        /**
+         * Triggered on mouse move — updates the cursor to row-resize when hovering near row border
+         */
         this.onMouseMove = (e) => {
             if (this.isResizing)
-                return; // Don't change cursor while resizing
+                return;
             const rect = this.canvas.getBoundingClientRect();
             const x = e.clientX - rect.left;
             const y = e.clientY - rect.top;
             const container = document.getElementById("container");
             const scrollTop = container.scrollTop;
-            // Get the row header width (first column width)
             const rowHeaderWidth = this.grid.getColWidth(0);
-            // Only show resize cursor if mouse is within the row header area
             if (x >= rowHeaderWidth) {
                 if (this.isHovering) {
                     this.canvas.style.cursor = "default";
@@ -73,34 +77,35 @@ export class RowResizeHandler {
                 }
                 return;
             }
-            let foundResizeBorder = false;
-            // Get visible row range for performance optimization
             const { start, end } = this.getVisibleRowRange(scrollTop);
-            // Check if we're near a row border within the visible row range
             for (let i = start; i < end; i++) {
                 const rowTop = this.grid.getRowY(i);
                 const rowHeight = this.grid.getRowHeight(i);
                 const relativeY = rowTop - scrollTop;
                 const rowBottom = relativeY + rowHeight;
-                // Check if mouse is near the bottom border of this row (within 5 pixels)
                 if (y >= rowBottom - 5 && y <= rowBottom + 5) {
                     this.canvas.style.cursor = "row-resize";
                     this.isHovering = true;
-                    foundResizeBorder = true;
-                    break;
+                    return;
                 }
             }
-            if (!foundResizeBorder && this.isHovering) {
+            if (this.isHovering) {
                 this.canvas.style.cursor = "default";
                 this.isHovering = false;
             }
         };
+        /**
+         * Triggered when the mouse leaves the canvas — resets the cursor
+         */
         this.onMouseLeave = () => {
             if (!this.isResizing && this.isHovering) {
                 this.canvas.style.cursor = "default";
                 this.isHovering = false;
             }
         };
+        /**
+         * Handles resizing logic during mouse drag movement
+         */
         this.onMouseMoveResize = (e) => {
             if (!this.isResizing)
                 return;
@@ -108,45 +113,49 @@ export class RowResizeHandler {
             const currentY = e.clientY - rect.top;
             const delta = currentY - this.startY;
             const newHeight = this.startHeight + delta;
-            console.log("Resizing row", this.targetRow, "to height:", newHeight);
             this.grid.suppressNextHeaderClick();
-            // Apply constraints for minimum and maximum row height
             if (newHeight >= 20 && newHeight <= 200) {
                 this.grid.setRowHeight(this.targetRow, newHeight);
                 this.currentRowHeight = newHeight;
             }
         };
+        /**
+         * Triggered on mouse up — ends resize and pushes command to undo stack
+         */
         this.onMouseUp = () => {
             if (this.isResizing) {
                 if (this.startHeight !== this.currentRowHeight) {
-                    console.log(`Committing ResizeRowCommand from ${this.startHeight} to ${this.currentRowHeight}`);
                     const cmd = new ResizeRowCommand(this.grid, this.startHeight, this.currentRowHeight, this.targetRow);
                     this.undoManager.executeCommand(cmd);
                 }
-                console.log("Ending resize");
                 this.isResizing = false;
                 this.targetRow = -1;
                 this.currentRowHeight = 0;
                 this.canvas.style.cursor = "default";
                 this.isHovering = false;
-                // Remove global mouse events
                 document.removeEventListener("mousemove", this.onMouseMoveResize);
                 document.removeEventListener("mouseup", this.onMouseUp);
             }
         };
         this.setupEventListeners();
     }
+    /**
+     * Adds necessary mouse event listeners to the canvas
+     */
     setupEventListeners() {
-        // Add event listeners to canvas
         this.canvas.addEventListener("mousedown", this.onMouseDown);
         this.canvas.addEventListener("mousemove", this.onMouseMove);
         this.canvas.addEventListener("mouseleave", this.onMouseLeave);
         this.canvas.style.cursor = "default";
     }
+    /**
+     * Calculates the visible range of rows in the canvas based on scroll position
+     * @param scrollTop The vertical scroll offset
+     * @returns An object with the `start` and `end` visible row indices
+     */
     getVisibleRowRange(scrollTop) {
         const canvasHeight = this.canvas.height;
         const buffer = 100;
-        // Find the first visible row
         let start = 1;
         for (let i = 1; i < this.grid.totalRows; i++) {
             const rowTop = this.grid.getRowY(i);
@@ -156,7 +165,6 @@ export class RowResizeHandler {
                 break;
             }
         }
-        // Find the last visible row
         let end = this.grid.totalRows;
         for (let i = start; i < this.grid.totalRows; i++) {
             const rowTop = this.grid.getRowY(i);
@@ -168,12 +176,13 @@ export class RowResizeHandler {
         }
         return { start, end };
     }
-    // Clean up method to remove event listeners
+    /**
+     * Destroys the event listeners and resets internal state
+     */
     destroy() {
         this.canvas.removeEventListener("mousedown", this.onMouseDown);
         this.canvas.removeEventListener("mousemove", this.onMouseMove);
         this.canvas.removeEventListener("mouseleave", this.onMouseLeave);
-        // Clean up any active resize operation
         if (this.isResizing) {
             document.removeEventListener("mousemove", this.onMouseMoveResize);
             document.removeEventListener("mouseup", this.onMouseUp);

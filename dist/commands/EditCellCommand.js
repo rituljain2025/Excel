@@ -1,4 +1,16 @@
+/**
+ * Command to edit the value of a single cell in the grid.
+ * Implements the Command interface to support undo-redo operations.
+ */
 export class EditCellCommand {
+    /**
+     * Initializes a new EditCellCommand instance.
+     * @param {Grid} grid - The grid where the edit is performed.
+     * @param {number} row - The row index of the cell to edit.
+     * @param {number} col - The column index of the cell to edit.
+     * @param {string} oldValue - The original value before editing.
+     * @param {string} newValue - The new value to set during execution.
+     */
     constructor(grid, row, col, oldValue, newValue) {
         this.grid = grid;
         this.row = row;
@@ -6,10 +18,18 @@ export class EditCellCommand {
         this.oldValue = oldValue;
         this.newValue = newValue;
     }
+    /**
+     * Executes the command by updating the cell with the new value
+     * and redrawing the grid.
+     */
     execute() {
         this.grid.setCellData(this.row, this.col, this.newValue);
         this.grid.redraw();
     }
+    /**
+     * Undoes the cell edit by restoring the original value
+     * and redrawing the grid.
+     */
     undo() {
         this.grid.setCellData(this.row, this.col, this.oldValue);
         this.grid.redraw();

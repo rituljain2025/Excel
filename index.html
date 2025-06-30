@@ -1,42 +1,58 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="style.css">
-    <title>Excel Grid</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" integrity="sha512-Evv84Mr4kqVGRNSgIGL/F/aIDqQb7xQ2vcrdIwxfjThSH8CSR7PBEakCr51Ck+w+/U6swU2Im1vVX0SVk9ABhg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <title>Excel Grid</title>
 </head>
 <body>
+
+  <!-- Navigation bar containing tools and actions -->
+  <nav class="navbar">
+    <h1>Excel Grid</h1>
     
-    <nav class="navbar">
-        <h1>Excel Grid</h1>
-        <button class="nav-button" id="countBtn">Count</button>
-        <button class="nav-button" id="minBtn">Min</button>
-        <button class="nav-button" id="maxBtn">Max</button>
-        <button class="nav-button" id="sumBtn">Sum</button>
-        <button class="nav-button" id="avgBtn">Average</button>
-        <button class="nav-button load-data" id="loadDataBtn">Load Sample Data</button>
+    <!-- Buttons to compute statistics on selected cells -->
+    <button class="nav-button" id="countBtn">Count</button>
+    <button class="nav-button" id="minBtn">Min</button>
+    <button class="nav-button" id="maxBtn">Max</button>
+    <button class="nav-button" id="sumBtn">Sum</button>
+    <button class="nav-button" id="avgBtn">Average</button>
 
-        <button id="undo">Undo</button>
-        <button id="redo">Redo</button>
-        <button id="bold"><strong>Bold</strong></button>
-        <button id="italic"><i>I</i></button>
+    <!-- Button to load pre-generated sample data into the grid -->
+    <button class="nav-button load-data" id="loadDataBtn"><i class="fa-solid fa-spinner"></i> Data</button>
 
-        <button id="insertRowBtn">Insert Row</button>
-        <button id="insertColumnBtn">Insert Column</button>
-        <button id="deleteRowBtn">Delete Row</button>
-        <button id="deleteColumnBtn">Delete Column</button>
-        
-        
-        <!-- <input type="file" id="fileInput" accept=".json,.csv"> -->
-        <div class="stats-display hidden" id="statsDisplay">
-            Select cells to see statistics
-        </div>
-    </nav>
-    <div id="container">
-            <div id="spacer"></div>
+  
+    <!-- Row/Column insertion and deletion buttons -->
+    <button id="insertRowBtn"><i class="fa-solid fa-plus"></i> Row</button>
+    <button id="insertColumnBtn"><i class="fa-solid fa-plus"></i> Column</button>
+    <button id="deleteRowBtn"><i class="fa-solid fa-trash"></i> Row</button>
+    <button id="deleteColumnBtn"><i class="fa-solid fa-trash"></i> Column</button>
+
+   
+     <!-- Undo/Redo functionality buttons -->
+    <button id="undo"><i class="fa-solid fa-rotate-left"></i></button>
+    <button id="redo"><i class="fa-solid fa-rotate-right"></i></button>
+      <!-- Formatting buttons for selected cells -->
+    <button id="bold"><i class="fa-solid fa-bold"></i></button>
+    <button id="italic"><i class="fa-solid fa-italic"></i></button>
+
+        <!-- Display area for computed statistics -->
+    <div class="stats-display hidden" id="statsDisplay">
+      Select cells to see statistics
     </div>
-    <canvas id="excelCanvas"></canvas>
-    <script type="module" src="./dist/main.js"></script>
+  </nav>
+
+  <!-- Main scrollable container that may include custom scrollbars -->
+  <div id="container">
+    <div id="spacer"></div> <!-- Optional: used to adjust spacing/layout -->
+  </div>
+
+  <!-- Canvas element used to draw the Excel-like grid -->
+  <canvas id="excelCanvas"></canvas>
+
+  <!-- Main entry script for the application -->
+  <script type="module" src="./dist/main.js"></script>
 </body>
 </html>

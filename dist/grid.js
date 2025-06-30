@@ -1,3 +1,4 @@
+import { FormulaEvaluator } from "./FormulaEvaluator.js";
 export class Grid {
     constructor(ctx, canvas) {
         this.selectedColumn = null;
@@ -15,6 +16,9 @@ export class Grid {
         this.cellData = new Map();
         this.lastRowHeaderWidth = 0;
         this.cellStyleData = new Map();
+        this.formulaEvaluator = new FormulaEvaluator((row, col) => {
+            return this.cellData.get(row)?.get(col);
+        });
         this.ctx = ctx;
         this.canvas = canvas;
         this.dpr = window.devicePixelRatio || 1;
@@ -193,7 +197,6 @@ export class Grid {
         if (this.isDragging) {
             this.isDragging = false;
             // Selection should persist after drag ends
-            console.log("Selection completed:", this.selectedCells);
         }
     }
     handleClick(e) {
@@ -381,11 +384,12 @@ export class Grid {
                 const text = rowData?.get(j);
                 if (text) {
                     const style = this.getCellStyle(i, j);
+                    const displayText = text.startsWith("=")
+                        ? this.formulaEvaluator.evaluate(text.substring(1))
+                        : text;
                     this.ctx.font = `${style?.italic ? "italic " : ""}${style?.bold ? "bold " : ""}12px Arial`;
                     this.ctx.fillStyle = "black";
-                    this.ctx.fillText(text, colX + colW / 2, rowY + rowH / 2);
-                    // this.ctx.fillStyle = "black";
-                    // this.ctx.fillText(text, colX + colW / 2, rowY + rowH / 2);
+                    this.ctx.fillText(displayText, colX + colW / 2, rowY + rowH / 2);
                 }
             }
         }
@@ -598,7 +602,6 @@ export class Grid {
         return this.selectedRow;
     }
     setSelectedRow(row) {
-        console.log("selected " + row);
         this.selectedRow = row;
     }
     insertColumn(index) {

@@ -1,4 +1,4 @@
-// main.js (Entry Point)
+// main.ts (Entry Point for Excel-like Grid App)
 import { CellEditor } from './cellEditor.js';
 import { Grid } from './grid.js';
 import { ResizeHandler } from './resizeHandler.js';
@@ -12,23 +12,30 @@ import { InsertColumnCommand } from './commands/InsertColumnCommand.js';
 import { DeleteRowCommand } from './commands/DeleteRowCommand.js';
 import { DeleteColumnCommand } from './commands/DeleteColumnCommand.js';
 window.addEventListener("DOMContentLoaded", () => {
+    /**
+     * Setup canvas with proper device pixel ratio scaling
+     */
     const canvas = document.getElementById("excelCanvas");
     const ctx = canvas.getContext("2d");
     const dpr = window.devicePixelRatio || 1;
     canvas.width = canvas.clientWidth * dpr;
     canvas.height = canvas.clientHeight * dpr;
     ctx.scale(dpr, dpr);
+    // Initialize grid and supporting classes
     const grid = new Grid(ctx, canvas);
     const undoManager = new UndoManager();
+    // Attach behaviors
     new ResizeHandler(canvas, grid, undoManager);
     new RowResizeHandler(canvas, grid, undoManager);
     new CellEditor(canvas, grid, undoManager);
     new ColumnSelectionHandler(canvas, grid);
     new RowMultiSelection(canvas, grid);
-    // Load sample data immediately
+    // Load initial data
     const data = generateSampleData();
-    grid.loadJsonData(data); // this should also call this.redraw()
-    // Hook up buttons
+    grid.loadJsonData(data); // also redraws grid
+    /**
+     * Attach statistic buttons
+     */
     document.getElementById("countBtn").addEventListener("click", () => {
         const { count } = grid.computeSelectedCellStats();
         updateStatsDisplay(`Count: ${count}`);
@@ -53,6 +60,9 @@ window.addEventListener("DOMContentLoaded", () => {
         const data = generateSampleData();
         grid.loadJsonData(data);
     });
+    /**
+     * Undo/Redo keyboard shortcuts
+     */
     document.addEventListener("keydown", (e) => {
         if (e.ctrlKey && e.key === "z") {
             undoManager.undo();
@@ -67,10 +77,17 @@ window.addEventListener("DOMContentLoaded", () => {
     document.getElementById("undo").addEventListener("click", () => {
         undoManager.undo();
     });
+    /**
+     * Displays computed stats in UI
+     * @param {string} text - The stat output string
+     */
     function updateStatsDisplay(text) {
         const statsDisplay = document.getElementById("statsDisplay");
         statsDisplay.textContent = text;
     }
+    /**
+     * Handle insert row button click
+     */
     const insertBtn = document.getElementById("insertRowBtn");
     insertBtn.addEventListener("click", () => {
         const selectedRow = grid.getSelectedRow();
@@ -81,6 +98,9 @@ window.addEventListener("DOMContentLoaded", () => {
         const cmd = new InsertRowCommand(grid, selectedRow);
         undoManager.executeCommand(cmd);
     });
+    /**
+     * Handles row/column header clicks for selection
+     */
     canvas.addEventListener("mousedown", (e) => {
         const rect = canvas.getBoundingClientRect();
         const y = e.clientY - rect.top;
@@ -90,6 +110,7 @@ window.addEventListener("DOMContentLoaded", () => {
         const scrollLeft = container.scrollLeft;
         const headerHeight = grid.getRowHeight(0);
         const rowHeaderWidth = grid.getColWidth(0);
+        // Row header click
         if (x < rowHeaderWidth && y >= headerHeight) {
             let currentY = 0;
             for (let i = 0; i < grid.totalRows; i++) {
@@ -102,6 +123,7 @@ window.addEventListener("DOMContentLoaded", () => {
                 currentY += rowHeight;
             }
         }
+        // Column header click
         else if (y < headerHeight && x >= rowHeaderWidth) {
             let currentX = 0;
             for (let j = 0; j < grid.totalCols; j++) {
@@ -115,6 +137,9 @@ window.addEventListener("DOMContentLoaded", () => {
             }
         }
     });
+    /**
+     * Handle insert column button click
+     */
     document.getElementById("insertColumnBtn").addEventListener("click", () => {
         const selectedCol = grid.getSelectedColumn();
         if (selectedCol === null || selectedCol < 0) {
@@ -124,9 +149,12 @@ window.addEventListener("DOMContentLoaded", () => {
         const cmd = new InsertColumnCommand(grid, selectedCol);
         undoManager.executeCommand(cmd);
     });
+    /**
+     * Handle delete row button click
+     */
     document.getElementById("deleteRowBtn").addEventListener("click", () => {
         const selectedRow = grid.getSelectedRow();
-        console.log(selectedRow + "insise dekete");
+        console.log(selectedRow + " inside delete");
         if (selectedRow === null || selectedRow < 0) {
             alert("Please select a row to delete.");
             return;
@@ -134,25 +162,34 @@ window.addEventListener("DOMContentLoaded", () => {
         const cmd = new DeleteRowCommand(grid, selectedRow);
         undoManager.executeCommand(cmd);
     });
+    /**
+     * Handle delete column button click
+     */
     document.getElementById("deleteColumnBtn").addEventListener("click", () => {
         const selectedColumn = grid.getSelectedColumn();
-        console.log(selectedColumn + "insise dekete");
+        console.log(selectedColumn + " inside delete");
         if (selectedColumn === null || selectedColumn < 0) {
-            alert("Please select a row to delete.");
+            alert("Please select a column to delete.");
             return;
         }
         const cmd = new DeleteColumnCommand(grid, selectedColumn);
         undoManager.executeCommand(cmd);
     });
+    /**
+     * Apply bold formatting to selected cell
+     */
     document.getElementById("bold").addEventListener("click", () => {
-        const cell = grid.getSelectedCell(); // implement this if not present
+        const cell = grid.getSelectedCell(); // should return { row, col }
         if (!cell)
             return alert("Select a cell");
         grid.setCellStyle(cell.row, cell.col, { bold: true });
         grid.redraw();
     });
+    /**
+     * Apply italic formatting to selected cell
+     */
     document.getElementById("italic").addEventListener("click", () => {
-        const cell = grid.getSelectedCell(); // implement this if not present
+        const cell = grid.getSelectedCell();
         if (!cell)
             return alert("Select a cell");
         grid.setCellStyle(cell.row, cell.col, { italic: true });

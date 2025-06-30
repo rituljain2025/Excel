@@ -16,22 +16,11 @@
   position: absolute; 
   top: 0;
   left: 0;
-  /* width: 50000px; 
-  height: 2500000px; */
+ 
 }
-/* 
-#excelCanvas {
-  cursor:  cell;
-  pointer-events: auto;
-  position: fixed;
-  top: 0;
-  left: 0;
-  z-index: 10;
-  width: 100vw;
-  height: 100vh;
-} */
+
 .navbar {
-    background-color:white ;
+    background-color:#137e41 ;
     padding: 12px 20px;
     box-shadow: 0 2px 10px rgba(255, 255, 255, 0.1);
     display: flex;
@@ -42,10 +31,9 @@
     left: 0;
     right: 0;
     z-index: -1;
-    height: 60px;
-    color: #137e41;
-    border-bottom: 1px solid gray;
-
+    height: 50px;
+    color: white;
+   
 }
 
 
@@ -57,7 +45,7 @@
     position: relative;
     padding-top: 100px; 
     padding-right: 10px;
-    /* background-color: red; */
+    
 }
 
 
@@ -68,14 +56,19 @@
     top: 60px;
     left: 0;
     z-index: 10;
-    /* width: 100vw; */
     width: calc(100vw - 15px);
     height: calc(100vh - 75px);
 }
 button{
-  background-color: #137e41;
-  color: white;
+  background-color: white;
+  color:#242424;
   padding: 5px;
   border-radius: 5px;
   border: none;
+  cursor: pointer;
+  font-size: 14px;
+  box-shadow: 1px 1px 1px 1px rgb(7, 103, 55);
+}
+#countBtn{
+  margin-left: auto;
 }

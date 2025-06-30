@@ -1,10 +1,23 @@
+/**
+ * Handles drag-based multiple row selection in the grid.
+ */
 export class RowMultiSelection {
+    /**
+     * @param canvas The HTML canvas used for drawing the grid
+     * @param grid The Grid instance representing the data and drawing logic
+     */
     constructor(canvas, grid) {
         this.canvas = canvas;
         this.grid = grid;
+        /** Whether a row selection drag operation is currently in progress */
         this.isDragging = false;
+        /** The row index where the drag started */
         this.dragStartRow = -1;
+        /** The row index where the drag currently ends */
         this.dragEndRow = -1;
+        /**
+         * Handles mouse down event on the canvas to begin row drag selection
+         */
         this.onMouseDown = (e) => {
             const rect = this.canvas.getBoundingClientRect();
             const x = e.clientX - rect.left;
@@ -13,6 +26,7 @@ export class RowMultiSelection {
             const scrollTop = container?.scrollTop;
             const headerWidth = this.grid.getColWidth(0);
             const headerHeight = this.grid.getRowHeight(0);
+            // Only trigger selection when mouse is within row header region
             if (x < headerWidth && y >= headerHeight) {
                 const adjustedY = y + scrollTop;
                 const row = this.grid.getRowFromY(adjustedY);
@@ -25,6 +39,9 @@ export class RowMultiSelection {
                 }
             }
         };
+        /**
+         * Handles mouse move event to update the selected row range while dragging
+         */
         this.onMouseMove = (e) => {
             if (!this.isDragging)
                 return;
@@ -38,14 +55,17 @@ export class RowMultiSelection {
                 this.dragEndRow = row;
                 const start = Math.min(this.dragStartRow, this.dragEndRow);
                 const end = Math.max(this.dragStartRow, this.dragEndRow);
-                this.grid.setRowRangeSelection(this.dragStartRow, this.dragEndRow);
+                this.grid.setRowRangeSelection(start, end);
                 this.grid.redraw();
             }
         };
-        this.onMouseUp = (e) => {
+        /**
+         * Handles mouse up event to finalize the row drag selection
+         */
+        this.onMouseUp = (_e) => {
             if (this.isDragging) {
                 this.isDragging = false;
-                this.grid.suppressNextHeaderClick();
+                this.grid.suppressNextHeaderClick(); // Prevent conflict with header click logic
             }
         };
         this.canvas.addEventListener("mousedown", this.onMouseDown);
