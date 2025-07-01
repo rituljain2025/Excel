@@ -1,4 +1,5 @@
-import { Grid } from "./grid";
+import { Grid } from "./grid.js";
+import { SelectionManager } from "./SelectionManager.js";
 
 /**
  * Handles mouse-based column range selection in the grid.
@@ -28,7 +29,7 @@ export class ColumnSelectionHandler {
    * @param {HTMLCanvasElement} canvas - The canvas where the grid is rendered.
    * @param {Grid} grid - The grid instance to manipulate column selection state.
    */
-  constructor(private canvas: HTMLCanvasElement, private grid: Grid) {
+  constructor(private canvas: HTMLCanvasElement, private grid: Grid,private selectionManager:SelectionManager) {
     this.canvas.addEventListener("mousedown", this.onMouseDown);
     this.canvas.addEventListener("mousemove", this.onMouseMove);
     this.canvas.addEventListener("mouseup", this.onMouseUp);
@@ -99,7 +100,7 @@ export class ColumnSelectionHandler {
   private onMouseUp = (_e: MouseEvent) => {
     if (this.isDragging) {
       this.isDragging = false;
-      this.grid.suppressNextHeaderClick(); // Prevents interference with click-based selection
+      this.selectionManager.suppressNextHeaderClick(); // Prevents interference with click-based selection
       console.log("Column range selected:", this.startCol, "to", this.endCol);
     }
   };

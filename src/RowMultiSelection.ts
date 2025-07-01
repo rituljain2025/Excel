@@ -1,4 +1,5 @@
-import { Grid } from "./grid";
+import { Grid } from "./grid.js";
+import { SelectionManager } from "./SelectionManager.js";
 
 /**
  * Handles drag-based multiple row selection in the grid.
@@ -17,7 +18,7 @@ export class RowMultiSelection {
    * @param canvas The HTML canvas used for drawing the grid
    * @param grid The Grid instance representing the data and drawing logic
    */
-  constructor(private canvas: HTMLCanvasElement, private grid: Grid) {
+  constructor(private canvas: HTMLCanvasElement, private grid: Grid,private selectionManager:SelectionManager) {
     this.canvas.addEventListener("mousedown", this.onMouseDown);
     this.canvas.addEventListener("mousemove", this.onMouseMove);
     this.canvas.addEventListener("mouseup", this.onMouseUp);
@@ -82,7 +83,7 @@ export class RowMultiSelection {
   public onMouseUp = (_e: MouseEvent) => {
     if (this.isDragging) {
       this.isDragging = false;
-      this.grid.suppressNextHeaderClick(); // Prevent conflict with header click logic
+      this.selectionManager.suppressNextHeaderClick(); // Prevent conflict with header click logic
     }
   };
 }

@@ -8,9 +8,10 @@ export class ColumnSelectionHandler {
      * @param {HTMLCanvasElement} canvas - The canvas where the grid is rendered.
      * @param {Grid} grid - The grid instance to manipulate column selection state.
      */
-    constructor(canvas, grid) {
+    constructor(canvas, grid, selectionManager) {
         this.canvas = canvas;
         this.grid = grid;
+        this.selectionManager = selectionManager;
         /**
          * Indicates whether a drag operation is in progress.
          * @type {boolean}
@@ -86,7 +87,7 @@ export class ColumnSelectionHandler {
         this.onMouseUp = (_e) => {
             if (this.isDragging) {
                 this.isDragging = false;
-                this.grid.suppressNextHeaderClick(); // Prevents interference with click-based selection
+                this.selectionManager.suppressNextHeaderClick(); // Prevents interference with click-based selection
                 console.log("Column range selected:", this.startCol, "to", this.endCol);
             }
         };

@@ -77,16 +77,17 @@ export class CellEditor {
     input.style.position = "absolute";
     input.style.left = `${cellX - scrollLeft + rect.left}px`;
     input.style.top = `${cellY - scrollTop + rect.top}px`;
-    input.style.width = `${cellW - 2}px`;
-    input.style.height = `${cellH - 2}px`;
+    input.style.width = `${cellW}px`;
+    input.style.height = `${cellH }px`;
     input.style.fontSize = "12px";
-    input.style.border = "none";
+    input.style.border = "2px solid #137e41";
     input.style.outline = "none";
     input.style.fontFamily = "Arial, sans-serif";
     input.style.padding = "0";
     input.style.margin = "0";
     input.style.zIndex = "1000";
     input.style.boxSizing = "border-box";
+
 
     // Attach the input to the DOM and focus it
     document.body.appendChild(input);

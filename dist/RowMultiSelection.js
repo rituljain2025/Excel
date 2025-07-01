@@ -6,9 +6,10 @@ export class RowMultiSelection {
      * @param canvas The HTML canvas used for drawing the grid
      * @param grid The Grid instance representing the data and drawing logic
      */
-    constructor(canvas, grid) {
+    constructor(canvas, grid, selectionManager) {
         this.canvas = canvas;
         this.grid = grid;
+        this.selectionManager = selectionManager;
         /** Whether a row selection drag operation is currently in progress */
         this.isDragging = false;
         /** The row index where the drag started */
@@ -65,7 +66,7 @@ export class RowMultiSelection {
         this.onMouseUp = (_e) => {
             if (this.isDragging) {
                 this.isDragging = false;
-                this.grid.suppressNextHeaderClick(); // Prevent conflict with header click logic
+                this.selectionManager.suppressNextHeaderClick(); // Prevent conflict with header click logic
             }
         };
         this.canvas.addEventListener("mousedown", this.onMouseDown);

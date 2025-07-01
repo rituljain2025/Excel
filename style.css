@@ -69,6 +69,9 @@ button{
   font-size: 14px;
   box-shadow: 1px 1px 1px 1px rgb(7, 103, 55);
 }
-#countBtn{
+#statsDisplay{
   margin-left: auto;
+  background-color: #137e41;
+  color: white;
+  box-shadow: 1px 1px 1px 1px  #106635;
 }

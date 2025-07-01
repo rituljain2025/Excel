@@ -12,6 +12,7 @@ import { InsertRowCommand } from './commands/InsertRowCommand.js';
 import { InsertColumnCommand } from './commands/InsertColumnCommand.js';
 import { DeleteRowCommand } from './commands/DeleteRowCommand.js';
 import { DeleteColumnCommand } from './commands/DeleteColumnCommand.js';
+import { SelectionManager } from './SelectionManager.js';
 
 
 window.addEventListener("DOMContentLoaded", () => {
@@ -30,12 +31,13 @@ window.addEventListener("DOMContentLoaded", () => {
   const undoManager = new UndoManager();
 
   // Attach behaviors
-  new ResizeHandler(canvas, grid, undoManager);
-  new RowResizeHandler(canvas, grid, undoManager);
+ 
   new CellEditor(canvas, grid, undoManager);
-  new ColumnSelectionHandler(canvas, grid);
-  new RowMultiSelection(canvas, grid);
-
+  const selection = new SelectionManager(canvas,grid);
+  new ColumnSelectionHandler(canvas, grid,selection);
+  new RowMultiSelection(canvas, grid,selection);
+  new ResizeHandler(canvas, grid, undoManager,selection);
+  new RowResizeHandler(canvas, grid, undoManager,selection);
   // Load initial data
   const data = generateSampleData();
   grid.loadJsonData(data); // also redraws grid
@@ -207,9 +209,17 @@ window.addEventListener("DOMContentLoaded", () => {
   document.getElementById("bold")!.addEventListener("click", () => {
     const cell = grid.getSelectedCell(); // should return { row, col }
     if (!cell) return alert("Select a cell");
-    grid.setCellStyle(cell.row, cell.col, { bold: true });
+    const style = grid.getCellStyle(cell.row,cell.col);
+    if(style?.bold){
+          grid.setCellStyle(cell.row, cell.col, { bold: false });
+    }else
+    {
+       grid.setCellStyle(cell.row, cell.col, { bold: true });
+    }
+    
     grid.redraw();
   });
+    
 
   /**
    * Apply italic formatting to selected cell
@@ -217,7 +227,19 @@ window.addEventListener("DOMContentLoaded", () => {
   document.getElementById("italic")!.addEventListener("click", () => {
     const cell = grid.getSelectedCell();
     if (!cell) return alert("Select a cell");
-    grid.setCellStyle(cell.row, cell.col, { italic: true });
+    const style = grid.getCellStyle(cell.row,cell.col);
+    if(style?.italic){
+         grid.setCellStyle(cell.row, cell.col, { italic: false });
+    }else{
+        grid.setCellStyle(cell.row, cell.col, { italic: true });
+    }
+  
     grid.redraw();
   });
+   
+  grid.onStatsUpdate(({ count, sum, avg, min, max }) => {
+    const display = `Count: ${count} | Sum: ${sum} | Avg: ${avg !== null ? avg.toFixed(2) : 'N/A'} | Min: ${min ?? 'N/A'} | Max: ${max ?? 'N/A'}`;
+    updateStatsDisplay(display);
+  });
+
 });

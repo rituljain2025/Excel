@@ -1,6 +1,7 @@
 import { UndoManager } from './commands/UndoManager.js';
 import { Grid } from './grid.js';
 import { ResizeColumnCommand } from './commands/ResizeColumnCommand.js';
+import { SelectionManager } from './SelectionManager.js';
 
 /**
  * Handles resizing of columns in the grid when the user drags near column edges.
@@ -24,7 +25,7 @@ export class ResizeHandler {
    * @param grid Grid instance to manipulate column widths
    * @param undoManager UndoManager to support undo/redo functionality
    */
-  constructor(private canvas: HTMLCanvasElement, private grid: Grid, private undoManager: UndoManager) {
+  constructor(private canvas: HTMLCanvasElement, private grid: Grid, private undoManager: UndoManager,private selectionManager : SelectionManager) {
     this.canvas.addEventListener("mousedown", this.onMouseDown);
     this.canvas.addEventListener("mousemove", this.onMouseMove);
     this.canvas.addEventListener("mouseleave", this.onMouseLeave);
@@ -42,10 +43,11 @@ export class ResizeHandler {
    * Handles mouse down event to initiate resizing if user clicks near column edge
    */
   private onMouseDown = (e: MouseEvent) => {
+   
     const rect = this.canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
-
+   
     if (!this.isInColumnHeader(y)) return;
 
     const container = document.getElementById("container")!;
@@ -56,7 +58,9 @@ export class ResizeHandler {
       const width = this.grid.getColWidth(col);
 
       if (Math.abs(x - (cumulativeX + width)) < 5) {
+        this.selectionManager.suppressNextHeaderClick(); 
         this.isResizing = true;
+
         this.resizingColIndex = col;
         this.startX = x;
         this.startWidth = width;
@@ -70,7 +74,7 @@ export class ResizeHandler {
       }
 
       cumulativeX += width;
-      if (cumulativeX > this.canvas.width + scrollLeft) break;
+      if (cumulativeX > this.canvas.clientWidth + scrollLeft) break;
     }
   };
 
@@ -85,7 +89,6 @@ export class ResizeHandler {
     const delta = currentX - this.startX;
     const newWidth = this.startWidth + delta;
 
-    this.grid.suppressNextHeaderClick(); // Prevent selection conflict
 
     if (newWidth >= 30 && newWidth <= 500) {
       this.grid.setColWidth(this.resizingColIndex, newWidth);
@@ -98,10 +101,11 @@ export class ResizeHandler {
    */
   private onMouseUp = () => {
     if (this.isResizing) {
+     
       const colIndex = this.resizingColIndex;
       const oldWidth = this.startWidth;
       const newWidth = this.currentNewWidth;
-
+    
       this.isResizing = false;
       this.resizingColIndex = -1;
       this.currentNewWidth = 0;
@@ -112,13 +116,14 @@ export class ResizeHandler {
         const cmd = new ResizeColumnCommand(this.grid, colIndex, newWidth);
         this.undoManager.executeCommand(cmd);
       }
-
+   
       this.canvas.style.cursor = "default";
       document.body.style.cursor = "default";
       this.isHovering = false;
 
       window.removeEventListener("mousemove", this.onMouseMoveResize);
       window.removeEventListener("mouseup", this.onMouseUp);
+      this.selectionManager.suppressNextHeaderClick();
     }
   };
 
@@ -149,7 +154,7 @@ export class ResizeHandler {
       const width = this.grid.getColWidth(col);
 
       if (Math.abs(x - (cumulativeX + width)) < 5) {
-        this.grid.suppressNextHeaderClick();
+       
         this.canvas.style.cursor = "col-resize";
         this.isHovering = true;
         foundResizeBorder = true;
@@ -157,7 +162,7 @@ export class ResizeHandler {
       }
 
       cumulativeX += width;
-      if (cumulativeX > this.canvas.width + scrollLeft) break;
+      if (cumulativeX > this.canvas.clientWidth + scrollLeft) break;
     }
 
     if (!foundResizeBorder && this.isHovering) {

@@ -8,10 +8,11 @@ export class RowResizeHandler {
      * @param grid The Grid instance for cell data and rendering
      * @param undoManager The UndoManager to support undo-redo of row resizing
      */
-    constructor(canvas, grid, undoManager) {
+    constructor(canvas, grid, undoManager, selectionManager) {
         this.canvas = canvas;
         this.grid = grid;
         this.undoManager = undoManager;
+        this.selectionManager = selectionManager;
         /** Whether the user is actively resizing a row */
         this.isResizing = false;
         /** Y position where resizing started */
@@ -113,7 +114,7 @@ export class RowResizeHandler {
             const currentY = e.clientY - rect.top;
             const delta = currentY - this.startY;
             const newHeight = this.startHeight + delta;
-            this.grid.suppressNextHeaderClick();
+            this.selectionManager.suppressNextHeaderClick();
             if (newHeight >= 20 && newHeight <= 200) {
                 this.grid.setRowHeight(this.targetRow, newHeight);
                 this.currentRowHeight = newHeight;

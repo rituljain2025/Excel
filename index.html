@@ -12,7 +12,10 @@
   <!-- Navigation bar containing tools and actions -->
   <nav class="navbar">
     <h1>Excel Grid</h1>
-    
+    <!-- Display area for computed statistics -->
+    <button class="stats-display hidden" id="statsDisplay">
+            Select cells to see statistics
+    </button>
     <!-- Buttons to compute statistics on selected cells -->
     <button class="nav-button" id="countBtn">Count</button>
     <button class="nav-button" id="minBtn">Min</button>
@@ -38,10 +41,7 @@
     <button id="bold"><i class="fa-solid fa-bold"></i></button>
     <button id="italic"><i class="fa-solid fa-italic"></i></button>
 
-        <!-- Display area for computed statistics -->
-    <div class="stats-display hidden" id="statsDisplay">
-      Select cells to see statistics
-    </div>
+    
   </nav>
 
   <!-- Main scrollable container that may include custom scrollbars -->

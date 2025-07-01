@@ -1,32 +1,38 @@
 import { FormulaEvaluator } from "./FormulaEvaluator.js";
 export class Grid {
-  private selectedColumn: number | null = null;
+  public selectedColumn: number | null = null;
   public selectedRow: number | null = null;
   
   // Cell range selection properties
-  private selectedCells: {
+  public selectedCells: {
     startRow: number;
     startCol: number;
     endRow: number;
     endCol: number;
   } | null = null;
-  private suppressHeaderClick: boolean = false;
+  // private suppressHeaderClick: number = 0;
   private isDragging: boolean = false;
   private dragStartRow: number = -1;
   private dragStartCol: number = -1;
   private ctx: CanvasRenderingContext2D;
   private canvas: HTMLCanvasElement;
   private dpr: number;
- 
-  private colWidths: number[] = [];
-  private rowHeights: number[] = [];
 
+  public colWidths: number[] = [];
+  public rowHeights: number[] = [];
+  public onStatsUpdateCallback?: (stats: {
+    count: number;
+    sum: number;
+    avg: number | null;
+    min: number | null;
+    max: number | null;
+  }) => void;
   public totalRows: number = 1000000;
   public totalCols: number = 5000;
   private cellData: Map<number, Map<number, string>> = new Map();
   private lastRowHeaderWidth: number = 0;
   private cellStyleData: Map<number, Map<number, { bold?: boolean; italic?: boolean }>> = new Map();
-
+ 
   constructor(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement) {
     this.ctx = ctx;
     this.canvas = canvas;
@@ -68,16 +74,20 @@ export class Grid {
     
 
     // Add mouse event handlers for cell selection
-    this.canvas.addEventListener("mousedown", this.handleMouseDown.bind(this));
-    this.canvas.addEventListener("mousemove", this.handleMouseMove.bind(this));
-    this.canvas.addEventListener("mouseup", this.handleMouseUp.bind(this));
-    this.canvas.addEventListener("click", this.handleClick.bind(this));
+    // this.canvas.addEventListener("mousedown", this.handleMouseDown.bind(this));
+    // this.canvas.addEventListener("mousemove", this.handleMouseMove.bind(this));
+    // this.canvas.addEventListener("mouseup", this.handleMouseUp.bind(this));
+    // this.canvas.addEventListener("click", this.handleClick.bind(this));
     
     this.drawVisibleGrid(0, 0, window.innerWidth, window.innerHeight);
   }
+ 
+  
+  // public suppressNextHeaderClick(): void {
+  //   this.suppressHeaderClick = Date.now() + 258;
+  // }
 
-
-  private setupCanvas(): void {
+  public setupCanvas(): void {
     const rect = this.canvas.getBoundingClientRect();
     
     // Set the actual size in memory (scaled up for high DPI)
@@ -95,7 +105,7 @@ export class Grid {
   private drawCrispLine(x1: number, y1: number, x2: number, y2: number): void {
     // Offset by 0.5 pixels to get crisp 1px lines
     const offset = 0.5;
-    this.ctx.lineWidth = 1 / this.dpr;
+    this.ctx.lineWidth = 1 / this.dpr ;
     this.ctx.beginPath();
 
     if (x1 === x2) {
@@ -177,7 +187,7 @@ export class Grid {
     return -1; // not found
   }
   
-  private getCellFromCoordinates(x: number, y: number): { row: number, col: number } {
+  public getCellFromCoordinates(x: number, y: number): { row: number, col: number } {
     const container = document.getElementById("container")!;
     const scrollLeft = container.scrollLeft;
     const scrollTop = container.scrollTop;
@@ -200,126 +210,140 @@ export class Grid {
       container.clientHeight
     );
   }
+  
 
-  private handleMouseDown(e: MouseEvent): void {
-    const rect = this.canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-
-    const headerHeight = this.rowHeights[0];
-    const rowHeaderWidth = this.colWidths[0];
+  // private handleMouseDown(e: MouseEvent): void {   
+  //   if(Date.now() < this.suppressHeaderClick){
+  //     return;
+  //   }
+  //   console.log("multi ");
     
-    // Only handle cell selection in data area
-    if (x >= rowHeaderWidth && y >= headerHeight) {
-      const { row, col } = this.getCellFromCoordinates(x, y);
+  //   const rect = this.canvas.getBoundingClientRect();
+  //   const x = e.clientX - rect.left;
+  //   const y = e.clientY - rect.top;
+
+  //   const headerHeight = this.rowHeights[0];
+  //   const rowHeaderWidth = this.colWidths[0];
+    
+  //   // Only handle cell selection in data area
+  //   if (x >= rowHeaderWidth && y >= headerHeight) {
+  //     const { row, col } = this.getCellFromCoordinates(x, y);
       
-      if (row > 0 && col > 0 && row < this.totalRows && col < this.totalCols) {
-        this.isDragging = true;
-        this.dragStartRow = row;
-        this.dragStartCol = col;
+  //     if (row > 0 && col > 0 && row < this.totalRows && col < this.totalCols) {
+  //       this.isDragging = true;
+  //       this.dragStartRow = row;
+  //       this.dragStartCol = col;
         
-        // Clear previous selections when starting cell selection
-        this.selectedColumn = null;
-        this.selectedRow = null;
-        this.selectedCells = {
-          startRow: row,
-          startCol: col,
-          endRow: row,
-          endCol: col
-        };
-        
-        this.redraw();
-      }
-    }
+  //       // Clear previous selections when starting cell selection
+  //       this.selectedColumn = null;
+  //       this.selectedRow = null;
+  //       this.selectedCells = {
+  //         startRow: row,
+  //         startCol: col,
+  //         endRow: row,
+  //         endCol: col
+  //       };
+  //       if (this.onStatsUpdateCallback) {
+  //           const stats = this.computeSelectedCellStats();
+  //           this.onStatsUpdateCallback(stats);
+  //       }
+  //       this.redraw();
+  //     }
+  //   }
    
-  }
+  // }
 
-  private handleMouseMove(e: MouseEvent): void {
-    if (!this.isDragging) return;
+  // private handleMouseMove(e: MouseEvent): void {
+  //   if (!this.isDragging) return;
 
-    const rect = this.canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+  //   const rect = this.canvas.getBoundingClientRect();
+  //   const x = e.clientX - rect.left;
+  //   const y = e.clientY - rect.top;
 
-    const headerHeight = this.rowHeights[0];
-    const rowHeaderWidth = this.colWidths[0];
+  //   const headerHeight = this.rowHeights[0];
+  //   const rowHeaderWidth = this.colWidths[0];
 
-    if (x >= rowHeaderWidth && y >= headerHeight) {
-      const { row, col } = this.getCellFromCoordinates(x, y);
+  //   if (x >= rowHeaderWidth && y >= headerHeight) {
+  //     const { row, col } = this.getCellFromCoordinates(x, y);
+
+
+  //     if (row > 0 && col > 0 && row < this.totalRows && col < this.totalCols) {
+  //       if (this.selectedCells) {
+  //         // Update the selection range
+  //         this.selectedCells.startRow = Math.min(this.dragStartRow, row);
+  //         this.selectedCells.endRow = Math.max(this.dragStartRow, row);
+  //         this.selectedCells.startCol = Math.min(this.dragStartCol, col);
+  //         this.selectedCells.endCol = Math.max(this.dragStartCol, col);
+  //         if (this.onStatsUpdateCallback) {
+  //           const stats = this.computeSelectedCellStats();
+  //           this.onStatsUpdateCallback(stats);
+  //         }
+  //         this.redraw();
+  //       }
+  //     }
+  //   }
+  // }
+
+  // private handleMouseUp(e: MouseEvent): void {
+  //   if (this.isDragging) {
+  //     this.isDragging = false;
+  //     // Selection should persist after drag ends
+  //   }
+  // }
+
+  // private handleClick(e: MouseEvent): void {
+  //   // Only handle clicks if we're not dragging (to avoid interfering with drag selection)
+  //   if (this.isDragging) return;
+  //   if(Date.now() < this.suppressHeaderClick){
+  //     return;
+  //   }
+  //   console.log("multi selection");
+    
+  //   const rect = this.canvas.getBoundingClientRect();
+  //   const x = e.clientX - rect.left;
+  //   const y = e.clientY - rect.top;
+
+  //   const container = document.getElementById("container")!;
+  //   const scrollLeft = container.scrollLeft;
+  //   const scrollTop = container.scrollTop;
+
+  //   const headerHeight = this.rowHeights[0];
+  //   const rowHeaderWidth = this.colWidths[0];
+
+  //   // Check if clicked in the visible column header area
+  //   if (y < headerHeight && x >= rowHeaderWidth) {
+  //     // Clicked in column header area (excluding row header)
+  //     // Clear cell selection when selecting column
+  //     this.selectedCells = null;
+  //     this.selectedRow = null;
       
-      if (row > 0 && col > 0 && row < this.totalRows && col < this.totalCols) {
-        if (this.selectedCells) {
-          // Update the selection range
-          this.selectedCells.startRow = Math.min(this.dragStartRow, row);
-          this.selectedCells.endRow = Math.max(this.dragStartRow, row);
-          this.selectedCells.startCol = Math.min(this.dragStartCol, col);
-          this.selectedCells.endCol = Math.max(this.dragStartCol, col);
-          
-          this.redraw();
-        }
-      }
-    }
-  }
-
-  private handleMouseUp(e: MouseEvent): void {
-    if (this.isDragging) {
-      this.isDragging = false;
-      // Selection should persist after drag ends
-    }
-  }
-
-  private handleClick(e: MouseEvent): void {
-    // Only handle clicks if we're not dragging (to avoid interfering with drag selection)
-    if (this.isDragging) return;
-    if (this.isDragging || this.suppressHeaderClick) {
-      this.suppressHeaderClick = false;
-      return;
-    }
-    const rect = this.canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-
-    const container = document.getElementById("container")!;
-    const scrollLeft = container.scrollLeft;
-    const scrollTop = container.scrollTop;
-
-    const headerHeight = this.rowHeights[0];
-    const rowHeaderWidth = this.colWidths[0];
-
-    // Check if clicked in the visible column header area
-    if (y < headerHeight && x >= rowHeaderWidth) {
-      // Clicked in column header area (excluding row header)
-      // Clear cell selection when selecting column
-      this.selectedCells = null;
-      this.selectedRow = null;
+  //     // Adjust x coordinate for scroll position to get the actual column
+  //     const adjustedX = x + scrollLeft;
+  //     const col = this.getColFromX(adjustedX);
+  //     this.selectedColumn = (col > 0) ? col : null;
       
-      // Adjust x coordinate for scroll position to get the actual column
-      const adjustedX = x + scrollLeft;
-      const col = this.getColFromX(adjustedX);
-      this.selectedColumn = (col > 0) ? col : null;
-      this.redraw();
-    } else if (x < rowHeaderWidth && y >= headerHeight) {
-      // Clicked in row header area (excluding column header)
-      // Clear cell selection when selecting row
-      this.selectedCells = null;
-      this.selectedColumn = null;
+  //     this.redraw();
+  //   } else if (x < rowHeaderWidth && y >= headerHeight) {
+  //     // Clicked in row header area (excluding column header)
+  //     // Clear cell selection when selecting row
+  //     this.selectedCells = null;
+  //     this.selectedColumn = null;
       
-      // Adjust y coordinate for scroll position to get the actual row
-      const adjustedY = y + scrollTop;
-      const row = this.getRowFromY(adjustedY);
-      this.selectedRow = (row > 0) ? row : null;
+  //     // Adjust y coordinate for scroll position to get the actual row
+  //     const adjustedY = y + scrollTop;
+  //     const row = this.getRowFromY(adjustedY);
+  //     this.selectedRow = (row > 0) ? row : null;
    
-      
-      this.redraw();
-    } else if (x < rowHeaderWidth && y < headerHeight) {
-      // Clicked in corner - clear all selections
-      this.selectedCells = null;
-      this.selectedColumn = null;
-      this.selectedRow = null;
-      this.redraw();
-    }
-    // If clicked in data area, cell selection is already handled by mousedown/drag
-  }
+  //     this.redraw();
+  //   } else if (x < rowHeaderWidth && y < headerHeight) {
+  //     // Clicked in corner - clear all selections
+  //     this.selectedCells = null;
+  //     this.selectedColumn = null;
+  //     this.selectedRow = null;
+  //     this.redraw();
+  //   }
+  //   // If clicked in data area, cell selection is already handled by mousedown/drag
+  // }
  
   public getColWidth(index: number): number {
     return this.colWidths[index];
@@ -376,6 +400,11 @@ export class Grid {
 
   // Get the currently selected cell range
   public getSelectedRange(): { startRow: number; startCol: number; endRow: number; endCol: number } | null {
+    if (this.onStatsUpdateCallback) {
+      const stats = this.computeSelectedCellStats();
+      this.onStatsUpdateCallback(stats);
+    }
+
     return this.selectedCells;
   }
 
@@ -459,7 +488,7 @@ export class Grid {
         const isCellSelected = this.isCellInSelection(i, j);
 
         if (isCellSelected) {
-          this.ctx.fillStyle = "white";
+          this.ctx.fillStyle = "#e8f2ec";
           this.ctx.fillRect(colX, rowY, colW, rowH);
         } else if (isSelectedColumn || isSelectedRow) {
           this.ctx.fillStyle = "#e7f2eb";
@@ -505,30 +534,45 @@ export class Grid {
     }
     // Step 2: Draw row headers (first column) 
     for (let i = startRow; i < endRow; i++) {
- 
       const rowY = this.getRowY(i) - scrollTop;
       const rowH = this.rowHeights[i];
       const isSelectedRow = this.selectedRow === i;
       const isInSelection = this.selectedCells && i >= this.selectedCells.startRow && i <= this.selectedCells.endRow;
-
+      
       const colWidth = this.colWidths[0];
-      this.ctx.fillStyle = (isSelectedRow || isInSelection) ? "#137e41" : "#f0f0f0";
-      this.ctx.fillRect(0, rowY, colWidth, rowH);
+      if(this.selectedColumn){
+        this.ctx.fillStyle = (isSelectedRow || isInSelection ) ? "#e8f2ec" : "#f0f0f0";
+        this.ctx.fillRect(0, rowY, colWidth, rowH);
+
+         // Borders
+        this.ctx.strokeStyle = "#e0e0e0";
+        this.drawCrispLine(0, rowY, colWidth, rowY);
+        this.drawCrispLine(0, rowY + rowH, colWidth, rowY + rowH);
+        this.drawCrispLine(0, rowY, 0, rowY + rowH);
+        this.ctx.strokeStyle = "#137e41";
+        this.drawCrispLine(colWidth, rowY, colWidth, rowY + rowH);
+        
+        this.ctx.fillStyle = (isSelectedRow || isInSelection) ? "#137e41" : "black";
       
-      // Borders
-      this.ctx.strokeStyle = "#e0e0e0";
-      this.drawCrispLine(0, rowY, colWidth, rowY);
-      this.drawCrispLine(0, rowY + rowH, colWidth, rowY + rowH);
-      this.drawCrispLine(0, rowY, 0, rowY + rowH);
-      this.drawCrispLine(colWidth, rowY, colWidth, rowY + rowH);
- 
-      this.ctx.fillStyle = (isSelectedRow || isInSelection) ? "white" : "black";
+        this.ctx.textAlign = "right";
+        this.ctx.fillText(i.toString(), colWidth-8, rowY + rowH / 2);
+      }else{
+        this.ctx.fillStyle = (isSelectedRow || isInSelection ) ? "#137e41" : "#f0f0f0";
+        this.ctx.fillRect(0, rowY, colWidth, rowH);
+
+        // Borders
+        this.ctx.strokeStyle = "#e0e0e0";
+        this.drawCrispLine(0, rowY, colWidth, rowY);
+        this.drawCrispLine(0, rowY + rowH, colWidth, rowY + rowH);
+        this.drawCrispLine(0, rowY, 0, rowY + rowH);
+    
+        this.drawCrispLine(colWidth, rowY, colWidth, rowY + rowH);
+        this.ctx.fillStyle = (isSelectedRow || isInSelection) ? "white" : "black";
       
-      this.ctx.textAlign = "right";
-      this.ctx.fillText(i.toString(), colWidth-8, rowY + rowH / 2);
-     
+        this.ctx.textAlign = "right";
+        this.ctx.fillText(i.toString(), colWidth-8, rowY + rowH / 2);
+      }
     }
-   
     // ─── Step 3: Draw column headers (first row) ────────────────────────────────────
     const headerHeight = this.rowHeights[0];
     for (let j = startCol; j < endCol; j++) {
@@ -536,24 +580,42 @@ export class Grid {
       const colW = this.colWidths[j];
       const isSelectedColumn = this.selectedColumn === j;
       const isInSelection = this.selectedCells && j >= this.selectedCells.startCol && j <= this.selectedCells.endCol;
+      this.ctx.textAlign = "center";
+      if(this.selectedRow){
+          this.ctx.fillStyle = (isSelectedColumn || isInSelection) ? "#e8f2ec" : "#f0f0f0";
+          this.ctx.fillRect(colX, 0, colW, headerHeight);
+        
+          // Borders
+          this.ctx.strokeStyle = "white";
+          this.drawCrispLine(colX, 0, colX + colW, 0);
+          this.drawCrispLine(colX, 0, colX, headerHeight);
+          this.drawCrispLine(colX + colW, 0, colX + colW, headerHeight);
+          this.ctx.strokeStyle = "#137e41";
+           this.drawCrispLine(colX, headerHeight, colX + colW, headerHeight);
+          
+          this.ctx.fillStyle = (isSelectedColumn || isInSelection) ? "#137e41" : "black";
 
-      this.ctx.fillStyle = (isSelectedColumn || isInSelection) ? "#137e41" : "#f0f0f0";
+          if (j > 0) {
+            const label = this.getColumnLabel(j - 1);
+            this.ctx.fillText(label, colX + colW / 2, headerHeight / 2);
+          }
+      }else{
+          this.ctx.fillStyle = (isSelectedColumn || isInSelection) ? "#137e41" : "#f0f0f0";
+          this.ctx.fillRect(colX, 0, colW, headerHeight);
+        
+          // Borders
+          this.ctx.strokeStyle = "white";
+          this.drawCrispLine(colX, 0, colX + colW, 0);
+          this.drawCrispLine(colX, headerHeight, colX + colW, headerHeight);
+          this.drawCrispLine(colX, 0, colX, headerHeight);
+          this.drawCrispLine(colX + colW, 0, colX + colW, headerHeight);
 
-      this.ctx.fillRect(colX, 0, colW, headerHeight);
-     
-      // Borders
-      this.ctx.strokeStyle = "white";
-      this.drawCrispLine(colX, 0, colX + colW, 0);
-      this.drawCrispLine(colX, headerHeight, colX + colW, headerHeight);
-      this.drawCrispLine(colX, 0, colX, headerHeight);
-      this.drawCrispLine(colX + colW, 0, colX + colW, headerHeight);
+          this.ctx.fillStyle = (isSelectedColumn || isInSelection) ? "white" : "black";
 
-      this.ctx.fillStyle = (isSelectedColumn || isInSelection) ? "white" : "black";
-
-      if (j > 0) {
-        const label = this.getColumnLabel(j - 1);
-        this.ctx.fillText(label, colX + colW / 2, headerHeight / 2);
-    
+          if (j > 0) {
+            const label = this.getColumnLabel(j - 1);
+            this.ctx.fillText(label, colX + colW / 2, headerHeight / 2);
+          }
       }
     }
 
@@ -699,10 +761,7 @@ export class Grid {
     this.selectedColumn = null;
     this.selectedRow = null;
   }
-  
-  public suppressNextHeaderClick(): void {
-    this.suppressHeaderClick = true;
-  }
+
   private calculateRowHeaderWidth(startRow: number, endRow: number): number {
     this.ctx.font = "12px Arial";
     let maxWidth = 0;
@@ -752,6 +811,11 @@ export class Grid {
     return this.selectedRow;
   }
   public setSelectedRow(row: number | null): void {
+    if (this.onStatsUpdateCallback) {
+      const stats = this.computeSelectedCellStats();
+      this.onStatsUpdateCallback(stats);
+    }
+
     this.selectedRow = row;
   }
   public insertColumn(index: number): void {
@@ -801,6 +865,10 @@ export class Grid {
     return this.selectedColumn;
   }
   public setSelectedColumn(index:number | null){
+    if (this.onStatsUpdateCallback) {
+      const stats = this.computeSelectedCellStats();
+      this.onStatsUpdateCallback(stats);
+    }
     this.selectedColumn = index;
   }
   public setCellStyle(row: number, col: number, style: { bold?: boolean; italic?: boolean }): void {
@@ -832,6 +900,13 @@ export class Grid {
    
     return this.cellData.get(row)?.get(col);
   });
+
+
+
+  public onStatsUpdate(callback: typeof this.onStatsUpdateCallback) {
+    this.onStatsUpdateCallback = callback;
+  }
+
 } 
 
 

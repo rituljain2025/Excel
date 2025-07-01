@@ -1,6 +1,7 @@
 import { ResizeRowCommand } from "./commands/ResizeRowCommand.js";
 import { Grid } from "./grid.js";
 import { UndoManager } from "./commands/UndoManager.js";
+import { SelectionManager } from "./SelectionManager.js";
 
 /**
  * Handles mouse-based row resizing functionality in the grid.
@@ -32,7 +33,8 @@ export class RowResizeHandler {
   constructor(
     private canvas: HTMLCanvasElement,
     private grid: Grid,
-    private undoManager: UndoManager
+    private undoManager: UndoManager,
+    private selectionManager:SelectionManager
   ) {
     this.setupEventListeners();
   }
@@ -183,7 +185,7 @@ export class RowResizeHandler {
     const delta = currentY - this.startY;
     const newHeight = this.startHeight + delta;
 
-    this.grid.suppressNextHeaderClick();
+    this.selectionManager.suppressNextHeaderClick();
 
     if (newHeight >= 20 && newHeight <= 200) {
       this.grid.setRowHeight(this.targetRow, newHeight);
@@ -196,6 +198,7 @@ export class RowResizeHandler {
    */
   private onMouseUp = () => {
     if (this.isResizing) {
+       
       if (this.startHeight !== this.currentRowHeight) {
         const cmd = new ResizeRowCommand(
           this.grid,
