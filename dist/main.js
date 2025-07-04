@@ -12,6 +12,7 @@ import { InsertColumnCommand } from './commands/InsertColumnCommand.js';
 import { DeleteRowCommand } from './commands/DeleteRowCommand.js';
 import { DeleteColumnCommand } from './commands/DeleteColumnCommand.js';
 import { SelectionManager } from './SelectionManager.js';
+// import { MouseEventCoordinator } from './MouseEventCoordinator .js';
 window.addEventListener("DOMContentLoaded", () => {
     /**
      * Setup canvas with proper device pixel ratio scaling
@@ -22,19 +23,18 @@ window.addEventListener("DOMContentLoaded", () => {
     canvas.width = canvas.clientWidth * dpr;
     canvas.height = canvas.clientHeight * dpr;
     ctx.scale(dpr, dpr);
+    canvas._isResizing = false;
+    canvas._isRowResizing = false; // Add this line to track row resizing state
     // Initialize grid and supporting classes
     const grid = new Grid(ctx, canvas);
     const undoManager = new UndoManager();
     // Attach behaviors
     new CellEditor(canvas, grid, undoManager);
     const selection = new SelectionManager(canvas, grid);
-    new ColumnSelectionHandler(canvas, grid, selection);
-    new RowMultiSelection(canvas, grid, selection);
-    new ResizeHandler(canvas, grid, undoManager, selection);
-    new RowResizeHandler(canvas, grid, undoManager, selection);
-    // Load initial data
-    const data = generateSampleData();
-    grid.loadJsonData(data); // also redraws grid
+    const resizeHandler = new ResizeHandler(canvas, grid, undoManager, selection);
+    new ColumnSelectionHandler(canvas, grid, selection, resizeHandler);
+    const rowResizeHandler = new RowResizeHandler(canvas, grid, undoManager, selection);
+    new RowMultiSelection(canvas, grid, selection, rowResizeHandler);
     /**
      * Attach statistic buttons
      */
@@ -104,6 +104,8 @@ window.addEventListener("DOMContentLoaded", () => {
      * Handles row/column header clicks for selection
      */
     canvas.addEventListener("mousedown", (e) => {
+        if (canvas._isRowResizing || canvas._isResizing)
+            return; // <-- Add this line
         const rect = canvas.getBoundingClientRect();
         const y = e.clientY - rect.top;
         const x = e.clientX - rect.left;

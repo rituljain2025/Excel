@@ -6,10 +6,11 @@ export class RowMultiSelection {
      * @param canvas The HTML canvas used for drawing the grid
      * @param grid The Grid instance representing the data and drawing logic
      */
-    constructor(canvas, grid, selectionManager) {
+    constructor(canvas, grid, selectionManager, rowResizeHandler) {
         this.canvas = canvas;
         this.grid = grid;
         this.selectionManager = selectionManager;
+        this.rowResizeHandler = rowResizeHandler;
         /** Whether a row selection drag operation is currently in progress */
         this.isDragging = false;
         /** The row index where the drag started */
@@ -20,9 +21,15 @@ export class RowMultiSelection {
          * Handles mouse down event on the canvas to begin row drag selection
          */
         this.onMouseDown = (e) => {
+            if (this.canvas._isRowResizing)
+                return;
+            console.log("RowMultiSelection onMouseDown");
             const rect = this.canvas.getBoundingClientRect();
             const x = e.clientX - rect.left;
             const y = e.clientY - rect.top;
+            if (this.rowResizeHandler.isInRowResizeZone(x, y))
+                return; // Prevent conflict with row resizing
+            console.log("checking row header selection");
             const container = document.getElementById("container");
             const scrollTop = container?.scrollTop;
             const headerWidth = this.grid.getColWidth(0);
@@ -44,6 +51,8 @@ export class RowMultiSelection {
          * Handles mouse move event to update the selected row range while dragging
          */
         this.onMouseMove = (e) => {
+            if (this.canvas._isRowResizing)
+                return;
             if (!this.isDragging)
                 return;
             const rect = this.canvas.getBoundingClientRect();
@@ -64,6 +73,8 @@ export class RowMultiSelection {
          * Handles mouse up event to finalize the row drag selection
          */
         this.onMouseUp = (_e) => {
+            if (this.canvas._isRowResizing)
+                return;
             if (this.isDragging) {
                 this.isDragging = false;
                 this.selectionManager.suppressNextHeaderClick(); // Prevent conflict with header click logic
@@ -72,5 +83,10 @@ export class RowMultiSelection {
         this.canvas.addEventListener("mousedown", this.onMouseDown);
         this.canvas.addEventListener("mousemove", this.onMouseMove);
         this.canvas.addEventListener("mouseup", this.onMouseUp);
+    }
+    destroy() {
+        this.canvas.removeEventListener("mousedown", this.onMouseDown);
+        this.canvas.removeEventListener("mousemove", this.onMouseMove);
+        this.canvas.removeEventListener("mouseup", this.onMouseUp);
     }
 }

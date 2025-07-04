@@ -46,6 +46,8 @@ export class RowResizeHandler {
                 const rowBottom = relativeY + rowHeight;
                 if (y >= rowBottom - 5 && y <= rowBottom + 5) {
                     this.isResizing = true;
+                    this.canvas._isRowResizing = true;
+                    console.log(this.canvas._isRowResizing);
                     this.startY = y;
                     this.startHeight = rowHeight;
                     this.targetRow = i;
@@ -98,7 +100,7 @@ export class RowResizeHandler {
         /**
          * Triggered when the mouse leaves the canvas — resets the cursor
          */
-        this.onMouseLeave = () => {
+        this.onMouseLeave = (e) => {
             if (!this.isResizing && this.isHovering) {
                 this.canvas.style.cursor = "default";
                 this.isHovering = false;
@@ -123,17 +125,19 @@ export class RowResizeHandler {
         /**
          * Triggered on mouse up — ends resize and pushes command to undo stack
          */
-        this.onMouseUp = () => {
+        this.onMouseUp = (e) => {
             if (this.isResizing) {
                 if (this.startHeight !== this.currentRowHeight) {
                     const cmd = new ResizeRowCommand(this.grid, this.startHeight, this.currentRowHeight, this.targetRow);
                     this.undoManager.executeCommand(cmd);
                 }
+                this.canvas._isRowResizing = false;
                 this.isResizing = false;
                 this.targetRow = -1;
                 this.currentRowHeight = 0;
                 this.canvas.style.cursor = "default";
                 this.isHovering = false;
+                this.selectionManager.suppressNextHeaderClick();
                 document.removeEventListener("mousemove", this.onMouseMoveResize);
                 document.removeEventListener("mouseup", this.onMouseUp);
             }
@@ -177,6 +181,28 @@ export class RowResizeHandler {
         }
         return { start, end };
     }
+    isInRowResizeZone(x, y) {
+        const rowHeaderWidth = this.grid.getColWidth(0);
+        if (x > rowHeaderWidth)
+            return false;
+        const container = document.getElementById("container");
+        const scrollTop = container.scrollTop;
+        const adjustedY = y + scrollTop;
+        let cumulativeY = 0;
+        const tolerance = 5;
+        for (let row = 0; row < this.grid.totalRows; row++) {
+            const height = this.grid.getRowHeight(row);
+            const bottomEdge = cumulativeY + height;
+            if (Math.abs(adjustedY - bottomEdge) <= tolerance) {
+                return true;
+            }
+            cumulativeY += height;
+            if (cumulativeY > adjustedY + this.canvas.clientHeight) {
+                break;
+            }
+        }
+        return false;
+    }
     /**
      * Destroys the event listeners and resets internal state
      */
@@ -184,6 +210,8 @@ export class RowResizeHandler {
         this.canvas.removeEventListener("mousedown", this.onMouseDown);
         this.canvas.removeEventListener("mousemove", this.onMouseMove);
         this.canvas.removeEventListener("mouseleave", this.onMouseLeave);
+        document.removeEventListener("mousemove", this.onMouseMoveResize);
+        document.removeEventListener("mouseup", this.onMouseUp);
         if (this.isResizing) {
             document.removeEventListener("mousemove", this.onMouseMoveResize);
             document.removeEventListener("mouseup", this.onMouseUp);

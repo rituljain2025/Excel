@@ -25,7 +25,7 @@ export class ResizeHandler {
    * @param grid Grid instance to manipulate column widths
    * @param undoManager UndoManager to support undo/redo functionality
    */
-  constructor(private canvas: HTMLCanvasElement, private grid: Grid, private undoManager: UndoManager,private selectionManager : SelectionManager) {
+  constructor(private canvas: HTMLCanvasElement, private grid: Grid, private undoManager: UndoManager, private selectionManager: SelectionManager) {
     this.canvas.addEventListener("mousedown", this.onMouseDown);
     this.canvas.addEventListener("mousemove", this.onMouseMove);
     this.canvas.addEventListener("mouseleave", this.onMouseLeave);
@@ -40,41 +40,66 @@ export class ResizeHandler {
   }
 
   /**
-   * Handles mouse down event to initiate resizing if user clicks near column edge
+   * Finds the column border that's closest to the mouse position for resizing
    */
-  private onMouseDown = (e: MouseEvent) => {
-   
-    const rect = this.canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-   
-    if (!this.isInColumnHeader(y)) return;
-
+  private findResizableBorder(x: number): { col: number; borderX: number } | null {
     const container = document.getElementById("container")!;
     const scrollLeft = container.scrollLeft;
-    let cumulativeX = -scrollLeft;
+    const adjustedX = x + scrollLeft;
+    let cumulativeX = 0;
 
-    for (let col = 0; col < 500; col++) {
+    const totalCols = this.grid.totalCols || 500;
+    const tolerance = 5; // pixels
+
+    for (let col = 0; col < totalCols; col++) {
       const width = this.grid.getColWidth(col);
+      const rightEdge = cumulativeX + width;
 
-      if (Math.abs(x - (cumulativeX + width)) < 5) {
-        this.selectionManager.suppressNextHeaderClick(); 
-        this.isResizing = true;
-
-        this.resizingColIndex = col;
-        this.startX = x;
-        this.startWidth = width;
-        this.canvas.style.cursor = "col-resize";
-
-        window.addEventListener("mousemove", this.onMouseMoveResize);
-        window.addEventListener("mouseup", this.onMouseUp);
-        e.preventDefault();
-        e.stopPropagation();
-        return;
+      // Check if mouse is near the right edge of this column
+      if (Math.abs(adjustedX - rightEdge) <= tolerance) {
+        return {
+          col,
+          borderX: rightEdge - scrollLeft
+        };
       }
 
       cumulativeX += width;
-      if (cumulativeX > this.canvas.clientWidth + scrollLeft) break;
+
+      // Early break optimization: if we're way past the visible area, stop
+      if (cumulativeX > adjustedX + this.canvas.clientWidth) {
+        break;
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Handles mouse down event to initiate resizing if user clicks near column edge
+   */
+  private onMouseDown = (e: MouseEvent) => {
+
+    const rect = this.canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    if (!this.isInColumnHeader(y)) return;
+
+    const border = this.findResizableBorder(x);
+    if (border) {
+       (this.canvas as any)._isResizing = true;
+      this.isResizing = true;
+      this.resizingColIndex = border.col;
+      this.startX = x;
+      this.startWidth = this.grid.getColWidth(border.col);
+      this.canvas.style.cursor = "col-resize";
+
+      window.addEventListener("mousemove", this.onMouseMoveResize);
+      window.addEventListener("mouseup", this.onMouseUp);
+        this.selectionManager.suppressNextHeaderClick();
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
     }
   };
 
@@ -89,7 +114,6 @@ export class ResizeHandler {
     const delta = currentX - this.startX;
     const newWidth = this.startWidth + delta;
 
-
     if (newWidth >= 30 && newWidth <= 500) {
       this.grid.setColWidth(this.resizingColIndex, newWidth);
       this.currentNewWidth = newWidth;
@@ -101,22 +125,21 @@ export class ResizeHandler {
    */
   private onMouseUp = () => {
     if (this.isResizing) {
-     
+      (this.canvas as any)._isResizing = false;
       const colIndex = this.resizingColIndex;
       const oldWidth = this.startWidth;
       const newWidth = this.currentNewWidth;
-    
+
       this.isResizing = false;
       this.resizingColIndex = -1;
       this.currentNewWidth = 0;
 
-      if (oldWidth !== newWidth && newWidth >= 30 && newWidth <= 500) {
+      if (oldWidth !== newWidth && newWidth >= 30 && newWidth <= 500){
         this.grid.setColWidth(colIndex, oldWidth); // reset for undo consistency
-
         const cmd = new ResizeColumnCommand(this.grid, colIndex, newWidth);
         this.undoManager.executeCommand(cmd);
       }
-   
+       
       this.canvas.style.cursor = "default";
       document.body.style.cursor = "default";
       this.isHovering = false;
@@ -126,6 +149,7 @@ export class ResizeHandler {
       this.selectionManager.suppressNextHeaderClick();
     }
   };
+
 
   /**
    * Handles normal mouse movement to show resize cursor near column edges
@@ -145,29 +169,17 @@ export class ResizeHandler {
       return;
     }
 
-    const container = document.getElementById("container")!;
-    const scrollLeft = container.scrollLeft;
-    let cumulativeX = -scrollLeft;
-    let foundResizeBorder = false;
-
-    for (let col = 0; col < 500; col++) {
-      const width = this.grid.getColWidth(col);
-
-      if (Math.abs(x - (cumulativeX + width)) < 5) {
-       
+    const border = this.findResizableBorder(x);
+    if (border) {
+      if (!this.isHovering) {
         this.canvas.style.cursor = "col-resize";
         this.isHovering = true;
-        foundResizeBorder = true;
-        break;
       }
-
-      cumulativeX += width;
-      if (cumulativeX > this.canvas.clientWidth + scrollLeft) break;
-    }
-
-    if (!foundResizeBorder && this.isHovering) {
-      this.canvas.style.cursor = "default";
-      this.isHovering = false;
+    } else {
+      if (this.isHovering) {
+        this.canvas.style.cursor = "default";
+        this.isHovering = false;
+      }
     }
   };
 
@@ -180,7 +192,14 @@ export class ResizeHandler {
       this.isHovering = false;
     }
   };
+  public isCurrentlyResizing(): boolean {
+    return this.isResizing;
+  }
 
+  public isInResizeZone(x: number, y: number): boolean {
+    if (!this.isInColumnHeader(y)) return false;
+    return this.findResizableBorder(x) !== null;
+  }
   /**
    * Cleans up all event listeners and state
    */
@@ -196,4 +215,7 @@ export class ResizeHandler {
       document.body.style.cursor = "default";
     }
   }
+
 }
+
+

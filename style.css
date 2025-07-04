@@ -58,6 +58,7 @@
     z-index: 10;
     width: calc(100vw - 15px);
     height: calc(100vh - 75px);
+    
 }
 button{
   background-color: white;

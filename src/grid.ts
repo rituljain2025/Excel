@@ -2,7 +2,7 @@ import { FormulaEvaluator } from "./FormulaEvaluator.js";
 export class Grid {
   public selectedColumn: number | null = null;
   public selectedRow: number | null = null;
-  
+
   // Cell range selection properties
   public selectedCells: {
     startRow: number;
@@ -10,14 +10,15 @@ export class Grid {
     endRow: number;
     endCol: number;
   } | null = null;
-  // private suppressHeaderClick: number = 0;
+  private startRowOfSelection : number | null = null;
+  private startColOfSelection : number | null = null;
+
   private isDragging: boolean = false;
   private dragStartRow: number = -1;
   private dragStartCol: number = -1;
   private ctx: CanvasRenderingContext2D;
   private canvas: HTMLCanvasElement;
   private dpr: number;
-
   public colWidths: number[] = [];
   public rowHeights: number[] = [];
   public onStatsUpdateCallback?: (stats: {
@@ -32,7 +33,7 @@ export class Grid {
   private cellData: Map<number, Map<number, string>> = new Map();
   private lastRowHeaderWidth: number = 0;
   private cellStyleData: Map<number, Map<number, { bold?: boolean; italic?: boolean }>> = new Map();
- 
+  public selectionMode: "cell" | "row" | "column"  = "cell";
   constructor(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement) {
     this.ctx = ctx;
     this.canvas = canvas;
@@ -64,32 +65,18 @@ export class Grid {
         container.clientHeight
       );
     });
-  
-    
+
     window.addEventListener("resize", () => {
       this.setupCanvas();
       this.redraw();
     });
-    
-    
 
-    // Add mouse event handlers for cell selection
-    // this.canvas.addEventListener("mousedown", this.handleMouseDown.bind(this));
-    // this.canvas.addEventListener("mousemove", this.handleMouseMove.bind(this));
-    // this.canvas.addEventListener("mouseup", this.handleMouseUp.bind(this));
-    // this.canvas.addEventListener("click", this.handleClick.bind(this));
-    
     this.drawVisibleGrid(0, 0, window.innerWidth, window.innerHeight);
   }
  
-  
-  // public suppressNextHeaderClick(): void {
-  //   this.suppressHeaderClick = Date.now() + 258;
-  // }
-
   public setupCanvas(): void {
     const rect = this.canvas.getBoundingClientRect();
-    
+   
     // Set the actual size in memory (scaled up for high DPI)
     this.canvas.width = rect.width * this.dpr;
     this.canvas.height = rect.height * this.dpr;
@@ -98,6 +85,7 @@ export class Grid {
     this.canvas.style.width = rect.width + 'px';
     this.canvas.style.height = rect.height + 'px';
     
+   
     // Scale the drawing context so everything is drawn at the correct size
     this.ctx.scale(this.dpr, this.dpr);
   }
@@ -200,7 +188,7 @@ export class Grid {
 
     return { row, col };
   }
-
+ 
   public redraw(): void {
     const container = document.getElementById("container")!;
     this.drawVisibleGrid(
@@ -210,141 +198,7 @@ export class Grid {
       container.clientHeight
     );
   }
-  
 
-  // private handleMouseDown(e: MouseEvent): void {   
-  //   if(Date.now() < this.suppressHeaderClick){
-  //     return;
-  //   }
-  //   console.log("multi ");
-    
-  //   const rect = this.canvas.getBoundingClientRect();
-  //   const x = e.clientX - rect.left;
-  //   const y = e.clientY - rect.top;
-
-  //   const headerHeight = this.rowHeights[0];
-  //   const rowHeaderWidth = this.colWidths[0];
-    
-  //   // Only handle cell selection in data area
-  //   if (x >= rowHeaderWidth && y >= headerHeight) {
-  //     const { row, col } = this.getCellFromCoordinates(x, y);
-      
-  //     if (row > 0 && col > 0 && row < this.totalRows && col < this.totalCols) {
-  //       this.isDragging = true;
-  //       this.dragStartRow = row;
-  //       this.dragStartCol = col;
-        
-  //       // Clear previous selections when starting cell selection
-  //       this.selectedColumn = null;
-  //       this.selectedRow = null;
-  //       this.selectedCells = {
-  //         startRow: row,
-  //         startCol: col,
-  //         endRow: row,
-  //         endCol: col
-  //       };
-  //       if (this.onStatsUpdateCallback) {
-  //           const stats = this.computeSelectedCellStats();
-  //           this.onStatsUpdateCallback(stats);
-  //       }
-  //       this.redraw();
-  //     }
-  //   }
-   
-  // }
-
-  // private handleMouseMove(e: MouseEvent): void {
-  //   if (!this.isDragging) return;
-
-  //   const rect = this.canvas.getBoundingClientRect();
-  //   const x = e.clientX - rect.left;
-  //   const y = e.clientY - rect.top;
-
-  //   const headerHeight = this.rowHeights[0];
-  //   const rowHeaderWidth = this.colWidths[0];
-
-  //   if (x >= rowHeaderWidth && y >= headerHeight) {
-  //     const { row, col } = this.getCellFromCoordinates(x, y);
-
-
-  //     if (row > 0 && col > 0 && row < this.totalRows && col < this.totalCols) {
-  //       if (this.selectedCells) {
-  //         // Update the selection range
-  //         this.selectedCells.startRow = Math.min(this.dragStartRow, row);
-  //         this.selectedCells.endRow = Math.max(this.dragStartRow, row);
-  //         this.selectedCells.startCol = Math.min(this.dragStartCol, col);
-  //         this.selectedCells.endCol = Math.max(this.dragStartCol, col);
-  //         if (this.onStatsUpdateCallback) {
-  //           const stats = this.computeSelectedCellStats();
-  //           this.onStatsUpdateCallback(stats);
-  //         }
-  //         this.redraw();
-  //       }
-  //     }
-  //   }
-  // }
-
-  // private handleMouseUp(e: MouseEvent): void {
-  //   if (this.isDragging) {
-  //     this.isDragging = false;
-  //     // Selection should persist after drag ends
-  //   }
-  // }
-
-  // private handleClick(e: MouseEvent): void {
-  //   // Only handle clicks if we're not dragging (to avoid interfering with drag selection)
-  //   if (this.isDragging) return;
-  //   if(Date.now() < this.suppressHeaderClick){
-  //     return;
-  //   }
-  //   console.log("multi selection");
-    
-  //   const rect = this.canvas.getBoundingClientRect();
-  //   const x = e.clientX - rect.left;
-  //   const y = e.clientY - rect.top;
-
-  //   const container = document.getElementById("container")!;
-  //   const scrollLeft = container.scrollLeft;
-  //   const scrollTop = container.scrollTop;
-
-  //   const headerHeight = this.rowHeights[0];
-  //   const rowHeaderWidth = this.colWidths[0];
-
-  //   // Check if clicked in the visible column header area
-  //   if (y < headerHeight && x >= rowHeaderWidth) {
-  //     // Clicked in column header area (excluding row header)
-  //     // Clear cell selection when selecting column
-  //     this.selectedCells = null;
-  //     this.selectedRow = null;
-      
-  //     // Adjust x coordinate for scroll position to get the actual column
-  //     const adjustedX = x + scrollLeft;
-  //     const col = this.getColFromX(adjustedX);
-  //     this.selectedColumn = (col > 0) ? col : null;
-      
-  //     this.redraw();
-  //   } else if (x < rowHeaderWidth && y >= headerHeight) {
-  //     // Clicked in row header area (excluding column header)
-  //     // Clear cell selection when selecting row
-  //     this.selectedCells = null;
-  //     this.selectedColumn = null;
-      
-  //     // Adjust y coordinate for scroll position to get the actual row
-  //     const adjustedY = y + scrollTop;
-  //     const row = this.getRowFromY(adjustedY);
-  //     this.selectedRow = (row > 0) ? row : null;
-   
-  //     this.redraw();
-  //   } else if (x < rowHeaderWidth && y < headerHeight) {
-  //     // Clicked in corner - clear all selections
-  //     this.selectedCells = null;
-  //     this.selectedColumn = null;
-  //     this.selectedRow = null;
-  //     this.redraw();
-  //   }
-  //   // If clicked in data area, cell selection is already handled by mousedown/drag
-  // }
- 
   public getColWidth(index: number): number {
     return this.colWidths[index];
   }
@@ -427,7 +281,8 @@ export class Grid {
 
   private isCellInSelection(row: number, col: number): boolean {
     if (!this.selectedCells) return false;
-    
+    if(row === this.selectedCells.startRow && col === this.selectedCells.startCol)
+     { this.startColOfSelection = col; this.startRowOfSelection = row;}
     return row >= this.selectedCells.startRow && 
            row <= this.selectedCells.endRow && 
            col >= this.selectedCells.startCol && 
@@ -436,8 +291,8 @@ export class Grid {
   
   //Main function for cell , row and column
   private drawVisibleGrid(scrollTop: number, scrollLeft: number, viewWidth: number, viewHeight: number): void {
-
-    // Four argument it take left, top,width and height and clears portion
+   
+    // // Four argument it take left, top,width and height and clears portion
     this.ctx.clearRect(0, 0, this.canvas.width / this.dpr, this.canvas.height / this.dpr);
     
     //Finding which rows are currently visible
@@ -486,15 +341,15 @@ export class Grid {
         const colW = this.colWidths[j];
         const isSelectedColumn = this.selectedColumn === j;
         const isCellSelected = this.isCellInSelection(i, j);
-
-        if (isCellSelected) {
-          this.ctx.fillStyle = "#e8f2ec";
-          this.ctx.fillRect(colX, rowY, colW, rowH);
-        } else if (isSelectedColumn || isSelectedRow) {
-          this.ctx.fillStyle = "#e7f2eb";
+        if(this.startRowOfSelection === i && this.startColOfSelection === j){
+            this.ctx.fillStyle = "white";
           this.ctx.fillRect(colX, rowY, colW, rowH);
         }
-
+       else if (isCellSelected) {
+          this.ctx.fillStyle = "#e8f2ec";
+          this.ctx.fillRect(colX, rowY, colW, rowH);
+        } 
+      
         // Cell borders
         this.ctx.strokeStyle = "#e0e0e0";
         this.drawCrispLine(colX, rowY, colX + colW, rowY); //top border
@@ -512,9 +367,29 @@ export class Grid {
             ? this.formulaEvaluator.evaluate(text.substring(1))
             : text;
 
+           // Alignment logic
+          let isNumber = false;
+          let numericValue: number | null = null;
+          if (displayText.trim().endsWith("%")) {
+            const numPart = displayText.trim().slice(0, -1);
+            if (!isNaN(Number(numPart))) {
+              isNumber = true;
+              numericValue = Number(numPart);
+            }
+          } else if (!isNaN(Number(displayText)) && displayText.trim() !== "") {
+            isNumber = true;
+            numericValue = Number(displayText);
+          }
+
           this.ctx.font = `${style?.italic ? "italic " : ""}${style?.bold ? "bold " : ""}12px Arial`;
           this.ctx.fillStyle = "black";
-          this.ctx.fillText(displayText, colX + colW / 2, rowY + rowH / 2);
+          if (isNumber) {
+            this.ctx.textAlign = "right";
+            this.ctx.fillText(displayText, colX + colW - 4, rowY + rowH / 2);
+          } else {
+            this.ctx.textAlign = "left";
+            this.ctx.fillText(displayText, colX + 4, rowY + rowH / 2);
+          }
         }
 
       }
@@ -538,9 +413,29 @@ export class Grid {
       const rowH = this.rowHeights[i];
       const isSelectedRow = this.selectedRow === i;
       const isInSelection = this.selectedCells && i >= this.selectedCells.startRow && i <= this.selectedCells.endRow;
-      
+
       const colWidth = this.colWidths[0];
-      if(this.selectedColumn){
+      if(this.selectedCells && i >= this.selectedCells.startRow && i <= this.selectedCells.endRow && this.selectionMode === "cell"){
+        this.ctx.fillStyle =  "#e8f2ec";
+        this.ctx.fillRect(0, rowY, colWidth, rowH);
+
+        // Borders
+        this.ctx.strokeStyle = "#e0e0e0";
+        this.drawCrispLine(0, rowY, colWidth, rowY);
+    
+        this.drawCrispLine(0, rowY + rowH, colWidth, rowY + rowH);
+     
+        this.drawCrispLine(0, rowY, 0, rowY + rowH);
+        this.ctx.strokeStyle = "#137e41";
+        this.drawCrispLine(colWidth, rowY, colWidth, rowY + rowH);
+        this.ctx.strokeStyle = "yellow";
+        this.drawCrispLine(0, rowY + rowH, colWidth, rowY + rowH);
+
+        this.ctx.fillStyle = "#137e41";
+      
+        this.ctx.textAlign = "right";
+        this.ctx.fillText(i.toString(), colWidth-8, rowY + rowH / 2);
+      }else if(this.selectedColumn){
         this.ctx.fillStyle = (isSelectedRow || isInSelection ) ? "#e8f2ec" : "#f0f0f0";
         this.ctx.fillRect(0, rowY, colWidth, rowH);
 
@@ -572,8 +467,10 @@ export class Grid {
         this.ctx.textAlign = "right";
         this.ctx.fillText(i.toString(), colWidth-8, rowY + rowH / 2);
       }
+     
+     
     }
-    // ─── Step 3: Draw column headers (first row) ────────────────────────────────────
+    // Step 3: Draw column headers (first row)
     const headerHeight = this.rowHeights[0];
     for (let j = startCol; j < endCol; j++) {
       const colX = this.getColumnX(j) - scrollLeft;
@@ -581,7 +478,33 @@ export class Grid {
       const isSelectedColumn = this.selectedColumn === j;
       const isInSelection = this.selectedCells && j >= this.selectedCells.startCol && j <= this.selectedCells.endCol;
       this.ctx.textAlign = "center";
-      if(this.selectedRow){
+      
+      if(this.selectionMode === "cell"&& this.selectedCells && j >= this.selectedCells.startCol && j <= this.selectedCells.endCol){
+       
+        this.ctx.fillStyle =  "#e8f2ec";
+        this.ctx.fillRect(colX, 0, colW, headerHeight);
+
+        // Borders
+        this.ctx.strokeStyle = "#e0e0e0";
+        this.drawCrispLine(colX, 0, colX + colW, 0);
+        this.drawCrispLine(colX, headerHeight, colX + colW, headerHeight);
+       
+        this.drawCrispLine(colX, 0, colX, headerHeight);
+           this.ctx.strokeStyle = "#137e41";
+        this.drawCrispLine(colX + colW, 0, colX + colW, headerHeight);
+      
+        this.drawCrispLine(colX, headerHeight, colX + colW, headerHeight);
+
+        this.ctx.fillStyle = "#137e41";
+
+        if (j > 0) {
+          const label = this.getColumnLabel(j - 1);
+          this.ctx.fillText(label, colX + colW / 2, headerHeight / 2);
+        }
+      }
+      else if(this.selectedRow && (this.selectionMode === "row"  || this.selectionMode === "column")){
+      
+        
           this.ctx.fillStyle = (isSelectedColumn || isInSelection) ? "#e8f2ec" : "#f0f0f0";
           this.ctx.fillRect(colX, 0, colW, headerHeight);
         
@@ -599,7 +522,8 @@ export class Grid {
             const label = this.getColumnLabel(j - 1);
             this.ctx.fillText(label, colX + colW / 2, headerHeight / 2);
           }
-      }else{
+      }
+      else{
           this.ctx.fillStyle = (isSelectedColumn || isInSelection) ? "#137e41" : "#f0f0f0";
           this.ctx.fillRect(colX, 0, colW, headerHeight);
         
@@ -617,6 +541,7 @@ export class Grid {
             this.ctx.fillText(label, colX + colW / 2, headerHeight / 2);
           }
       }
+     
     }
 
     //  Step 4: Draw selection border (for range) 
@@ -750,6 +675,9 @@ export class Grid {
     };
     this.selectedColumn = null; // clear single column selection
     this.selectedRow = null;
+    this.selectionMode = "column";
+    console.log(this.selectedCells + this.selectionMode);
+    
   }
   public setRowRangeSelection(startRow :number,endRow:number){
     this.selectedCells={
@@ -760,6 +688,9 @@ export class Grid {
     }
     this.selectedColumn = null;
     this.selectedRow = null;
+    this.selectionMode = "row"; 
+    console.log("row selection");
+    
   }
 
   private calculateRowHeaderWidth(startRow: number, endRow: number): number {
@@ -901,10 +832,20 @@ export class Grid {
     return this.cellData.get(row)?.get(col);
   });
 
-
-
   public onStatsUpdate(callback: typeof this.onStatsUpdateCallback) {
     this.onStatsUpdateCallback = callback;
+  }
+  public getSelectedColumnRange(): { startCol: number; endCol: number } | null {
+    if (this.selectedColumn != null) {
+      return { startCol: this.selectedColumn, endCol: this.selectedColumn };
+    } else if (this.selectedCells) {
+      return {
+        startCol: this.selectedCells.startCol,
+        endCol: this.selectedCells.endCol,
+      };
+    } else {
+      return null;
+    }
   }
 
 } 

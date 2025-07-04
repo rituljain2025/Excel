@@ -5,8 +5,6 @@ export class Grid {
         this.selectedRow = null;
         // Cell range selection properties
         this.selectedCells = null;
-        this.startRowOfSelection = null;
-        this.startColOfSelection = null;
         this.isDragging = false;
         this.dragStartRow = -1;
         this.dragStartCol = -1;
@@ -17,7 +15,6 @@ export class Grid {
         this.cellData = new Map();
         this.lastRowHeaderWidth = 0;
         this.cellStyleData = new Map();
-        this.selectionMode = "cell";
         this.formulaEvaluator = new FormulaEvaluator((row, col) => {
             return this.cellData.get(row)?.get(col);
         });
@@ -211,10 +208,6 @@ export class Grid {
     isCellInSelection(row, col) {
         if (!this.selectedCells)
             return false;
-        if (row === this.selectedCells.startRow && col === this.selectedCells.startCol) {
-            this.startColOfSelection = col;
-            this.startRowOfSelection = row;
-        }
         return row >= this.selectedCells.startRow &&
             row <= this.selectedCells.endRow &&
             col >= this.selectedCells.startCol &&
@@ -268,12 +261,12 @@ export class Grid {
                 const colW = this.colWidths[j];
                 const isSelectedColumn = this.selectedColumn === j;
                 const isCellSelected = this.isCellInSelection(i, j);
-                if (this.startRowOfSelection === i && this.startColOfSelection === j) {
-                    this.ctx.fillStyle = "white";
+                if (isCellSelected) {
+                    this.ctx.fillStyle = "#e8f2ec";
                     this.ctx.fillRect(colX, rowY, colW, rowH);
                 }
-                else if (isCellSelected) {
-                    this.ctx.fillStyle = "#e8f2ec";
+                else if (isSelectedColumn || isSelectedRow) {
+                    this.ctx.fillStyle = "#e7f2eb";
                     this.ctx.fillRect(colX, rowY, colW, rowH);
                 }
                 // Cell borders
@@ -290,30 +283,9 @@ export class Grid {
                     const displayText = text.startsWith("=")
                         ? this.formulaEvaluator.evaluate(text.substring(1))
                         : text;
-                    // Alignment logic
-                    let isNumber = false;
-                    let numericValue = null;
-                    if (displayText.trim().endsWith("%")) {
-                        const numPart = displayText.trim().slice(0, -1);
-                        if (!isNaN(Number(numPart))) {
-                            isNumber = true;
-                            numericValue = Number(numPart);
-                        }
-                    }
-                    else if (!isNaN(Number(displayText)) && displayText.trim() !== "") {
-                        isNumber = true;
-                        numericValue = Number(displayText);
-                    }
                     this.ctx.font = `${style?.italic ? "italic " : ""}${style?.bold ? "bold " : ""}12px Arial`;
                     this.ctx.fillStyle = "black";
-                    if (isNumber) {
-                        this.ctx.textAlign = "right";
-                        this.ctx.fillText(displayText, colX + colW - 4, rowY + rowH / 2);
-                    }
-                    else {
-                        this.ctx.textAlign = "left";
-                        this.ctx.fillText(displayText, colX + 4, rowY + rowH / 2);
-                    }
+                    this.ctx.fillText(displayText, colX + colW / 2, rowY + rowH / 2);
                 }
             }
         }
@@ -334,23 +306,7 @@ export class Grid {
             const isSelectedRow = this.selectedRow === i;
             const isInSelection = this.selectedCells && i >= this.selectedCells.startRow && i <= this.selectedCells.endRow;
             const colWidth = this.colWidths[0];
-            if (this.selectedCells && i >= this.selectedCells.startRow && i <= this.selectedCells.endRow && this.selectionMode === "cell") {
-                this.ctx.fillStyle = "#e8f2ec";
-                this.ctx.fillRect(0, rowY, colWidth, rowH);
-                // Borders
-                this.ctx.strokeStyle = "#e0e0e0";
-                this.drawCrispLine(0, rowY, colWidth, rowY);
-                this.drawCrispLine(0, rowY + rowH, colWidth, rowY + rowH);
-                this.drawCrispLine(0, rowY, 0, rowY + rowH);
-                this.ctx.strokeStyle = "#137e41";
-                this.drawCrispLine(colWidth, rowY, colWidth, rowY + rowH);
-                this.ctx.strokeStyle = "yellow";
-                this.drawCrispLine(0, rowY + rowH, colWidth, rowY + rowH);
-                this.ctx.fillStyle = "#137e41";
-                this.ctx.textAlign = "right";
-                this.ctx.fillText(i.toString(), colWidth - 8, rowY + rowH / 2);
-            }
-            else if (this.selectedColumn) {
+            if (this.selectedColumn) {
                 this.ctx.fillStyle = (isSelectedRow || isInSelection) ? "#e8f2ec" : "#f0f0f0";
                 this.ctx.fillRect(0, rowY, colWidth, rowH);
                 // Borders
@@ -378,7 +334,7 @@ export class Grid {
                 this.ctx.fillText(i.toString(), colWidth - 8, rowY + rowH / 2);
             }
         }
-        // Step 3: Draw column headers (first row)
+        // ─── Step 3: Draw column headers (first row) ────────────────────────────────────
         const headerHeight = this.rowHeights[0];
         for (let j = startCol; j < endCol; j++) {
             const colX = this.getColumnX(j) - scrollLeft;
@@ -386,24 +342,7 @@ export class Grid {
             const isSelectedColumn = this.selectedColumn === j;
             const isInSelection = this.selectedCells && j >= this.selectedCells.startCol && j <= this.selectedCells.endCol;
             this.ctx.textAlign = "center";
-            if (this.selectionMode === "cell" && this.selectedCells && j >= this.selectedCells.startCol && j <= this.selectedCells.endCol) {
-                this.ctx.fillStyle = "#e8f2ec";
-                this.ctx.fillRect(colX, 0, colW, headerHeight);
-                // Borders
-                this.ctx.strokeStyle = "#e0e0e0";
-                this.drawCrispLine(colX, 0, colX + colW, 0);
-                this.drawCrispLine(colX, headerHeight, colX + colW, headerHeight);
-                this.drawCrispLine(colX, 0, colX, headerHeight);
-                this.ctx.strokeStyle = "#137e41";
-                this.drawCrispLine(colX + colW, 0, colX + colW, headerHeight);
-                this.drawCrispLine(colX, headerHeight, colX + colW, headerHeight);
-                this.ctx.fillStyle = "#137e41";
-                if (j > 0) {
-                    const label = this.getColumnLabel(j - 1);
-                    this.ctx.fillText(label, colX + colW / 2, headerHeight / 2);
-                }
-            }
-            else if (this.selectedRow && (this.selectionMode === "row" || this.selectionMode === "column")) {
+            if (this.selectedRow) {
                 this.ctx.fillStyle = (isSelectedColumn || isInSelection) ? "#e8f2ec" : "#f0f0f0";
                 this.ctx.fillRect(colX, 0, colW, headerHeight);
                 // Borders
@@ -539,8 +478,6 @@ export class Grid {
         };
         this.selectedColumn = null; // clear single column selection
         this.selectedRow = null;
-        this.selectionMode = "column";
-        console.log(this.selectedCells + this.selectionMode);
     }
     setRowRangeSelection(startRow, endRow) {
         this.selectedCells = {
@@ -551,8 +488,6 @@ export class Grid {
         };
         this.selectedColumn = null;
         this.selectedRow = null;
-        this.selectionMode = "row";
-        console.log("row selection");
     }
     calculateRowHeaderWidth(startRow, endRow) {
         this.ctx.font = "12px Arial";
@@ -676,19 +611,5 @@ export class Grid {
     }
     onStatsUpdate(callback) {
         this.onStatsUpdateCallback = callback;
-    }
-    getSelectedColumnRange() {
-        if (this.selectedColumn != null) {
-            return { startCol: this.selectedColumn, endCol: this.selectedColumn };
-        }
-        else if (this.selectedCells) {
-            return {
-                startCol: this.selectedCells.startCol,
-                endCol: this.selectedCells.endCol,
-            };
-        }
-        else {
-            return null;
-        }
     }
 }

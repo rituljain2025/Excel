@@ -3,6 +3,7 @@ import { Grid } from "./grid.js";
 import { UndoManager } from "./commands/UndoManager.js";
 import { SelectionManager } from "./SelectionManager.js";
 
+
 /**
  * Handles mouse-based row resizing functionality in the grid.
  */
@@ -34,7 +35,8 @@ export class RowResizeHandler {
     private canvas: HTMLCanvasElement,
     private grid: Grid,
     private undoManager: UndoManager,
-    private selectionManager:SelectionManager
+    private selectionManager:SelectionManager,
+ 
   ) {
     this.setupEventListeners();
   }
@@ -84,7 +86,7 @@ export class RowResizeHandler {
   /**
    * Triggered on mouse down — starts resizing if near row border in header area
    */
-  private onMouseDown = (e: MouseEvent) => {
+  public onMouseDown = (e: MouseEvent) => {
     const rect = this.canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
@@ -105,6 +107,9 @@ export class RowResizeHandler {
 
       if (y >= rowBottom - 5 && y <= rowBottom + 5) {
         this.isResizing = true;
+        (this.canvas as any)._isRowResizing = true;
+        console.log( (this.canvas as any)._isRowResizing);
+        
         this.startY = y;
         this.startHeight = rowHeight;
         this.targetRow = i;
@@ -124,7 +129,7 @@ export class RowResizeHandler {
   /**
    * Triggered on mouse move — updates the cursor to row-resize when hovering near row border
    */
-  private onMouseMove = (e: MouseEvent) => {
+  public onMouseMove = (e: MouseEvent) => {
     if (this.isResizing) return;
 
     const rect = this.canvas.getBoundingClientRect();
@@ -167,7 +172,7 @@ export class RowResizeHandler {
   /**
    * Triggered when the mouse leaves the canvas — resets the cursor
    */
-  private onMouseLeave = () => {
+  public onMouseLeave = (e: MouseEvent) => {
     if (!this.isResizing && this.isHovering) {
       this.canvas.style.cursor = "default";
       this.isHovering = false;
@@ -196,7 +201,7 @@ export class RowResizeHandler {
   /**
    * Triggered on mouse up — ends resize and pushes command to undo stack
    */
-  private onMouseUp = () => {
+  public onMouseUp = (e: MouseEvent) => {
     if (this.isResizing) {
        
       if (this.startHeight !== this.currentRowHeight) {
@@ -208,18 +213,43 @@ export class RowResizeHandler {
         );
         this.undoManager.executeCommand(cmd);
       }
-
+      (this.canvas as any)._isRowResizing = false;
       this.isResizing = false;
       this.targetRow = -1;
       this.currentRowHeight = 0;
       this.canvas.style.cursor = "default";
       this.isHovering = false;
-
+      this.selectionManager.suppressNextHeaderClick();
       document.removeEventListener("mousemove", this.onMouseMoveResize);
       document.removeEventListener("mouseup", this.onMouseUp);
     }
   };
+  public isInRowResizeZone(x: number, y: number): boolean {
+    const rowHeaderWidth = this.grid.getColWidth(0);
+    if (x > rowHeaderWidth) return false;
 
+    const container = document.getElementById("container")!;
+    const scrollTop = container.scrollTop;
+    const adjustedY = y + scrollTop;
+    let cumulativeY = 0;
+    const tolerance = 5;
+
+    for (let row = 0; row < this.grid.totalRows; row++) {
+      const height = this.grid.getRowHeight(row);
+      const bottomEdge = cumulativeY + height;
+
+      if (Math.abs(adjustedY - bottomEdge) <= tolerance) {
+        return true;
+      }
+
+      cumulativeY += height;
+      if (cumulativeY > adjustedY + this.canvas.clientHeight) {
+        break;
+      }
+    }
+
+    return false;
+  }
   /**
    * Destroys the event listeners and resets internal state
    */
@@ -227,7 +257,8 @@ export class RowResizeHandler {
     this.canvas.removeEventListener("mousedown", this.onMouseDown);
     this.canvas.removeEventListener("mousemove", this.onMouseMove);
     this.canvas.removeEventListener("mouseleave", this.onMouseLeave);
-
+    document.removeEventListener("mousemove", this.onMouseMoveResize);
+    document.removeEventListener("mouseup", this.onMouseUp);
     if (this.isResizing) {
       document.removeEventListener("mousemove", this.onMouseMoveResize);
       document.removeEventListener("mouseup", this.onMouseUp);
