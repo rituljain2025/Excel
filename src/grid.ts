@@ -7,12 +7,11 @@ export class Grid {
   public selectedCells: {
     startRow: number;
     startCol: number;
-    endRow: number;
+    endRow: number; 
     endCol: number;
   } | null = null;
   private startRowOfSelection : number | null = null;
   private startColOfSelection : number | null = null;
-
   private isDragging: boolean = false;
   private dragStartRow: number = -1;
   private dragStartCol: number = -1;
@@ -34,6 +33,10 @@ export class Grid {
   private lastRowHeaderWidth: number = 0;
   private cellStyleData: Map<number, Map<number, { bold?: boolean; italic?: boolean }>> = new Map();
   public selectionMode: "cell" | "row" | "column"  = "cell";
+  private isCopyMode: boolean = false;
+  private copyDashOffset: number = 0;
+  private copyRange: { startRow: number, startCol: number, endRow: number, endCol: number } | null = null;
+  private copyAnimationTimer: number | null = null;
   constructor(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement) {
     this.ctx = ctx;
     this.canvas = canvas;
@@ -41,7 +44,7 @@ export class Grid {
 
     let spacerHeight :number= 0;
     let spacerWidth :number = 0;
-   
+    
     for (let i = 0; i < this.totalCols; i++) {
       this.colWidths[i] = 80;
       spacerWidth += this.colWidths[i];
@@ -56,7 +59,9 @@ export class Grid {
     this.setupCanvas();
 
     const container = document.getElementById("container")!;
+    container.style.cursor = "cell";
 
+    
     container.addEventListener("scroll", () => {
       this.drawVisibleGrid(
         container.scrollTop,
@@ -75,17 +80,22 @@ export class Grid {
   }
  
   public setupCanvas(): void {
-    const rect = this.canvas.getBoundingClientRect();
-   
+    // const rect = this.canvas.getBoundingClientRect();
+     const container = document.getElementById("container")!;
+    // Use container's clientWidth/clientHeight for canvas size
+    const width = container.clientWidth;
+    const height = container.clientHeight;
+    
     // Set the actual size in memory (scaled up for high DPI)
-    this.canvas.width = rect.width * this.dpr;
-    this.canvas.height = rect.height * this.dpr;
+    this.canvas.width = width * this.dpr;
+    this.canvas.height = height * this.dpr;
     
     // Scale the canvas back down using CSS
-    this.canvas.style.width = rect.width + 'px';
-    this.canvas.style.height = rect.height + 'px';
+    this.canvas.style.width = width + 'px';
+    this.canvas.style.height = height + 'px';
     
-   
+    // Reset transform before scaling to avoid stacking scales
+    this.ctx.setTransform(1, 0, 0, 1, 0, 0);
     // Scale the drawing context so everything is drawn at the correct size
     this.ctx.scale(this.dpr, this.dpr);
   }
@@ -281,6 +291,7 @@ export class Grid {
 
   private isCellInSelection(row: number, col: number): boolean {
     if (!this.selectedCells) return false;
+ 
     if(row === this.selectedCells.startRow && col === this.selectedCells.startCol)
      { this.startColOfSelection = col; this.startRowOfSelection = row;}
     return row >= this.selectedCells.startRow && 
@@ -291,7 +302,8 @@ export class Grid {
   
   //Main function for cell , row and column
   private drawVisibleGrid(scrollTop: number, scrollLeft: number, viewWidth: number, viewHeight: number): void {
-   
+ 
+    this.canvas.style.cursor = "cell";
     // // Four argument it take left, top,width and height and clears portion
     this.ctx.clearRect(0, 0, this.canvas.width / this.dpr, this.canvas.height / this.dpr);
     
@@ -411,14 +423,15 @@ export class Grid {
     for (let i = startRow; i < endRow; i++) {
       const rowY = this.getRowY(i) - scrollTop;
       const rowH = this.rowHeights[i];
+      
       const isSelectedRow = this.selectedRow === i;
       const isInSelection = this.selectedCells && i >= this.selectedCells.startRow && i <= this.selectedCells.endRow;
-
       const colWidth = this.colWidths[0];
+      
       if(this.selectedCells && i >= this.selectedCells.startRow && i <= this.selectedCells.endRow && this.selectionMode === "cell"){
         this.ctx.fillStyle =  "#e8f2ec";
         this.ctx.fillRect(0, rowY, colWidth, rowH);
-
+   
         // Borders
         this.ctx.strokeStyle = "#e0e0e0";
         this.drawCrispLine(0, rowY, colWidth, rowY);
@@ -435,7 +448,23 @@ export class Grid {
       
         this.ctx.textAlign = "right";
         this.ctx.fillText(i.toString(), colWidth-8, rowY + rowH / 2);
-      }else if(this.selectedColumn){
+      }
+      // NEW: Multi-column selection, highlight row header with light green
+      else if(this.selectionMode === "column" && this.selectedCells && this.selectedCells.startCol !== this.selectedCells.endCol) {
+        this.ctx.fillStyle = (isSelectedRow || isInSelection ) ? "#e8f2ec" : "#f0f0f0";
+        this.ctx.fillRect(0, rowY, colWidth, rowH);
+        // Borders
+        this.ctx.strokeStyle = "#e0e0e0";
+        this.drawCrispLine(0, rowY, colWidth, rowY);
+        this.drawCrispLine(0, rowY + rowH, colWidth, rowY + rowH);
+        this.drawCrispLine(0, rowY, 0, rowY + rowH);
+        this.ctx.strokeStyle = "#137e41";
+        this.drawCrispLine(colWidth, rowY, colWidth, rowY + rowH);
+        this.ctx.fillStyle = (isSelectedRow || isInSelection) ? "#137e41" : "black";
+        this.ctx.textAlign = "right";
+        this.ctx.fillText(i.toString(), colWidth-8, rowY + rowH / 2);
+      }
+      else if( this.selectedColumn){
         this.ctx.fillStyle = (isSelectedRow || isInSelection ) ? "#e8f2ec" : "#f0f0f0";
         this.ctx.fillRect(0, rowY, colWidth, rowH);
 
@@ -467,7 +496,6 @@ export class Grid {
         this.ctx.textAlign = "right";
         this.ctx.fillText(i.toString(), colWidth-8, rowY + rowH / 2);
       }
-     
      
     }
     // Step 3: Draw column headers (first row)
@@ -502,7 +530,23 @@ export class Grid {
           this.ctx.fillText(label, colX + colW / 2, headerHeight / 2);
         }
       }
-      else if(this.selectedRow && (this.selectionMode === "row"  || this.selectionMode === "column")){
+      // NEW: Multi-row selection, highlight column header with light green and dark green border
+      else if(this.selectionMode === "row" && this.selectedCells && this.selectedCells.startRow !== this.selectedCells.endRow) {
+        this.ctx.fillStyle = (isSelectedColumn || isInSelection) ? "#e8f2ec" : "#f0f0f0";
+        this.ctx.fillRect(colX, 0, colW, headerHeight);
+        // Borders
+        this.ctx.strokeStyle = "#e0e0e0";
+        this.drawCrispLine(colX, 0, colX + colW, 0);  this.ctx.strokeStyle = "#137e41";
+        this.drawCrispLine(colX, headerHeight, colX + colW, headerHeight); this.ctx.strokeStyle = "#e0e0e0";
+        this.drawCrispLine(colX, 0, colX, headerHeight);  
+        this.drawCrispLine(colX + colW, 0, colX + colW, headerHeight);
+        this.ctx.fillStyle = (isSelectedColumn || isInSelection) ? "#137e41" : "black";
+        if (j > 0) {
+          const label = this.getColumnLabel(j - 1);
+          this.ctx.fillText(label, colX + colW / 2, headerHeight / 2);
+        }
+      }
+      else if(this.selectedRow ){
       
         
           this.ctx.fillStyle = (isSelectedColumn || isInSelection) ? "#e8f2ec" : "#f0f0f0";
@@ -541,7 +585,7 @@ export class Grid {
             this.ctx.fillText(label, colX + colW / 2, headerHeight / 2);
           }
       }
-     
+    
     }
 
     //  Step 4: Draw selection border (for range) 
@@ -640,7 +684,19 @@ export class Grid {
     this.ctx.strokeStyle = "#0078d7";
     this.ctx.lineWidth = 1 / this.dpr;
     this.drawCrispRect(startX + 1, startY + 1, width - 2, height - 2);
-    
+
+    // Draw marching ants if in copy mode and this is the copied range
+    if (this.isCopyMode && this.copyRange &&
+      startRow === this.copyRange.startRow && startCol === this.copyRange.startCol &&
+      endRow === this.copyRange.endRow && endCol === this.copyRange.endCol) {
+      this.ctx.save();
+      this.ctx.setLineDash([6, 4]);
+      this.ctx.lineDashOffset = -this.copyDashOffset;
+      this.ctx.strokeStyle = "#137e41";
+      this.ctx.lineWidth = 2 / this.dpr;
+      this.ctx.strokeRect(startX+3, startY+3, width-5, height-5);
+      this.ctx.restore();
+    }
   }
   
   public loadJsonData(data: Array<Object>): void {
@@ -665,18 +721,28 @@ export class Grid {
 
     this.redraw();
   }
-
+  public setCellRangeSelection(startRow: number, startCol: number, endRow: number, endCol: number): void {
+    
+      this.selectedCells = { startRow, startCol, endRow, endCol };
+      this.selectedColumn = null; 
+      this.selectedRow = null;  
+      this.selectionMode = "cell";
+   
+  }
   public setColumnRangeSelection(startCol: number, endCol: number): void {
+    console.log("Setting column range selection from", startCol, "to", endCol);
+    
     this.selectedCells = {
       startRow: 1,
       endRow: this.totalRows - 1,
       startCol,
       endCol
     };
+    console.log("Selected cells:", this.selectedCells);
+    
     this.selectedColumn = null; // clear single column selection
     this.selectedRow = null;
     this.selectionMode = "column";
-    console.log(this.selectedCells + this.selectionMode);
     
   }
   public setRowRangeSelection(startRow :number,endRow:number){
@@ -689,8 +755,7 @@ export class Grid {
     this.selectedColumn = null;
     this.selectedRow = null;
     this.selectionMode = "row"; 
-    console.log("row selection");
-    
+   
   }
 
   private calculateRowHeaderWidth(startRow: number, endRow: number): number {
@@ -846,6 +911,29 @@ export class Grid {
     } else {
       return null;
     }
+  }
+
+  public enableCopyMode(range: { startRow: number, startCol: number, endRow: number, endCol: number }) {
+    this.isCopyMode = true;
+    this.copyRange = { ...range };
+    this.copyDashOffset = 0;
+    if (this.copyAnimationTimer !== null) {
+      clearInterval(this.copyAnimationTimer);
+    }
+    this.copyAnimationTimer = window.setInterval(() => {
+      this.copyDashOffset = (this.copyDashOffset + 1) % 12;
+      this.redraw();
+    }, 60);
+    this.redraw();
+  }
+  public disableCopyMode() {
+    this.isCopyMode = false;
+    this.copyRange = null;
+    if (this.copyAnimationTimer !== null) {
+      clearInterval(this.copyAnimationTimer);
+      this.copyAnimationTimer = null;
+    }
+    this.redraw();
   }
 
 } 

@@ -18,6 +18,10 @@ export class Grid {
         this.lastRowHeaderWidth = 0;
         this.cellStyleData = new Map();
         this.selectionMode = "cell";
+        this.isCopyMode = false;
+        this.copyDashOffset = 0;
+        this.copyRange = null;
+        this.copyAnimationTimer = null;
         this.formulaEvaluator = new FormulaEvaluator((row, col) => {
             return this.cellData.get(row)?.get(col);
         });
@@ -39,6 +43,7 @@ export class Grid {
         spacer.style.width = spacerWidth + "px";
         this.setupCanvas();
         const container = document.getElementById("container");
+        container.style.cursor = "cell";
         container.addEventListener("scroll", () => {
             this.drawVisibleGrid(container.scrollTop, container.scrollLeft, container.clientWidth, container.clientHeight);
         });
@@ -49,13 +54,19 @@ export class Grid {
         this.drawVisibleGrid(0, 0, window.innerWidth, window.innerHeight);
     }
     setupCanvas() {
-        const rect = this.canvas.getBoundingClientRect();
+        // const rect = this.canvas.getBoundingClientRect();
+        const container = document.getElementById("container");
+        // Use container's clientWidth/clientHeight for canvas size
+        const width = container.clientWidth;
+        const height = container.clientHeight;
         // Set the actual size in memory (scaled up for high DPI)
-        this.canvas.width = rect.width * this.dpr;
-        this.canvas.height = rect.height * this.dpr;
+        this.canvas.width = width * this.dpr;
+        this.canvas.height = height * this.dpr;
         // Scale the canvas back down using CSS
-        this.canvas.style.width = rect.width + 'px';
-        this.canvas.style.height = rect.height + 'px';
+        this.canvas.style.width = width + 'px';
+        this.canvas.style.height = height + 'px';
+        // Reset transform before scaling to avoid stacking scales
+        this.ctx.setTransform(1, 0, 0, 1, 0, 0);
         // Scale the drawing context so everything is drawn at the correct size
         this.ctx.scale(this.dpr, this.dpr);
     }
@@ -222,6 +233,7 @@ export class Grid {
     }
     //Main function for cell , row and column
     drawVisibleGrid(scrollTop, scrollLeft, viewWidth, viewHeight) {
+        this.canvas.style.cursor = "cell";
         // // Four argument it take left, top,width and height and clears portion
         this.ctx.clearRect(0, 0, this.canvas.width / this.dpr, this.canvas.height / this.dpr);
         //Finding which rows are currently visible
@@ -350,6 +362,21 @@ export class Grid {
                 this.ctx.textAlign = "right";
                 this.ctx.fillText(i.toString(), colWidth - 8, rowY + rowH / 2);
             }
+            // NEW: Multi-column selection, highlight row header with light green
+            else if (this.selectionMode === "column" && this.selectedCells && this.selectedCells.startCol !== this.selectedCells.endCol) {
+                this.ctx.fillStyle = (isSelectedRow || isInSelection) ? "#e8f2ec" : "#f0f0f0";
+                this.ctx.fillRect(0, rowY, colWidth, rowH);
+                // Borders
+                this.ctx.strokeStyle = "#e0e0e0";
+                this.drawCrispLine(0, rowY, colWidth, rowY);
+                this.drawCrispLine(0, rowY + rowH, colWidth, rowY + rowH);
+                this.drawCrispLine(0, rowY, 0, rowY + rowH);
+                this.ctx.strokeStyle = "#137e41";
+                this.drawCrispLine(colWidth, rowY, colWidth, rowY + rowH);
+                this.ctx.fillStyle = (isSelectedRow || isInSelection) ? "#137e41" : "black";
+                this.ctx.textAlign = "right";
+                this.ctx.fillText(i.toString(), colWidth - 8, rowY + rowH / 2);
+            }
             else if (this.selectedColumn) {
                 this.ctx.fillStyle = (isSelectedRow || isInSelection) ? "#e8f2ec" : "#f0f0f0";
                 this.ctx.fillRect(0, rowY, colWidth, rowH);
@@ -403,7 +430,25 @@ export class Grid {
                     this.ctx.fillText(label, colX + colW / 2, headerHeight / 2);
                 }
             }
-            else if (this.selectedRow && (this.selectionMode === "row" || this.selectionMode === "column")) {
+            // NEW: Multi-row selection, highlight column header with light green and dark green border
+            else if (this.selectionMode === "row" && this.selectedCells && this.selectedCells.startRow !== this.selectedCells.endRow) {
+                this.ctx.fillStyle = (isSelectedColumn || isInSelection) ? "#e8f2ec" : "#f0f0f0";
+                this.ctx.fillRect(colX, 0, colW, headerHeight);
+                // Borders
+                this.ctx.strokeStyle = "#e0e0e0";
+                this.drawCrispLine(colX, 0, colX + colW, 0);
+                this.ctx.strokeStyle = "#137e41";
+                this.drawCrispLine(colX, headerHeight, colX + colW, headerHeight);
+                this.ctx.strokeStyle = "#e0e0e0";
+                this.drawCrispLine(colX, 0, colX, headerHeight);
+                this.drawCrispLine(colX + colW, 0, colX + colW, headerHeight);
+                this.ctx.fillStyle = (isSelectedColumn || isInSelection) ? "#137e41" : "black";
+                if (j > 0) {
+                    const label = this.getColumnLabel(j - 1);
+                    this.ctx.fillText(label, colX + colW / 2, headerHeight / 2);
+                }
+            }
+            else if (this.selectedRow) {
                 this.ctx.fillStyle = (isSelectedColumn || isInSelection) ? "#e8f2ec" : "#f0f0f0";
                 this.ctx.fillRect(colX, 0, colW, headerHeight);
                 // Borders
@@ -512,6 +557,18 @@ export class Grid {
         this.ctx.strokeStyle = "#0078d7";
         this.ctx.lineWidth = 1 / this.dpr;
         this.drawCrispRect(startX + 1, startY + 1, width - 2, height - 2);
+        // Draw marching ants if in copy mode and this is the copied range
+        if (this.isCopyMode && this.copyRange &&
+            startRow === this.copyRange.startRow && startCol === this.copyRange.startCol &&
+            endRow === this.copyRange.endRow && endCol === this.copyRange.endCol) {
+            this.ctx.save();
+            this.ctx.setLineDash([6, 4]);
+            this.ctx.lineDashOffset = -this.copyDashOffset;
+            this.ctx.strokeStyle = "#137e41";
+            this.ctx.lineWidth = 2 / this.dpr;
+            this.ctx.strokeRect(startX + 3, startY + 3, width - 5, height - 5);
+            this.ctx.restore();
+        }
     }
     loadJsonData(data) {
         this.cellData.clear();
@@ -530,17 +587,24 @@ export class Grid {
         });
         this.redraw();
     }
+    setCellRangeSelection(startRow, startCol, endRow, endCol) {
+        this.selectedCells = { startRow, startCol, endRow, endCol };
+        this.selectedColumn = null;
+        this.selectedRow = null;
+        this.selectionMode = "cell";
+    }
     setColumnRangeSelection(startCol, endCol) {
+        console.log("Setting column range selection from", startCol, "to", endCol);
         this.selectedCells = {
             startRow: 1,
             endRow: this.totalRows - 1,
             startCol,
             endCol
         };
+        console.log("Selected cells:", this.selectedCells);
         this.selectedColumn = null; // clear single column selection
         this.selectedRow = null;
         this.selectionMode = "column";
-        console.log(this.selectedCells + this.selectionMode);
     }
     setRowRangeSelection(startRow, endRow) {
         this.selectedCells = {
@@ -552,7 +616,6 @@ export class Grid {
         this.selectedColumn = null;
         this.selectedRow = null;
         this.selectionMode = "row";
-        console.log("row selection");
     }
     calculateRowHeaderWidth(startRow, endRow) {
         this.ctx.font = "12px Arial";
@@ -690,5 +753,27 @@ export class Grid {
         else {
             return null;
         }
+    }
+    enableCopyMode(range) {
+        this.isCopyMode = true;
+        this.copyRange = { ...range };
+        this.copyDashOffset = 0;
+        if (this.copyAnimationTimer !== null) {
+            clearInterval(this.copyAnimationTimer);
+        }
+        this.copyAnimationTimer = window.setInterval(() => {
+            this.copyDashOffset = (this.copyDashOffset + 1) % 12;
+            this.redraw();
+        }, 60);
+        this.redraw();
+    }
+    disableCopyMode() {
+        this.isCopyMode = false;
+        this.copyRange = null;
+        if (this.copyAnimationTimer !== null) {
+            clearInterval(this.copyAnimationTimer);
+            this.copyAnimationTimer = null;
+        }
+        this.redraw();
     }
 }

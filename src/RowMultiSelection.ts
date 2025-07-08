@@ -19,25 +19,19 @@ export class RowMultiSelection {
    * @param canvas The HTML canvas used for drawing the grid
    * @param grid The Grid instance representing the data and drawing logic
    */
-  constructor(private canvas: HTMLCanvasElement, private grid: Grid,private selectionManager:SelectionManager,private rowResizeHandler : RowResizeHandler) {
-    this.canvas.addEventListener("mousedown", this.onMouseDown);
-    this.canvas.addEventListener("mousemove", this.onMouseMove);
-    this.canvas.addEventListener("mouseup", this.onMouseUp);
-  }
+  constructor(private canvas: HTMLCanvasElement, private grid: Grid) {}
 
   /**
    * Handles mouse down event on the canvas to begin row drag selection
    */
   public onMouseDown = (e: MouseEvent) => {
     if ((this.canvas as any)._isRowResizing) return;
-    console.log("RowMultiSelection onMouseDown");
-    
+   
     const rect = this.canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
-    if(this.rowResizeHandler.isInRowResizeZone(x,y)) return; // Prevent conflict with row resizing
-    console.log("checking row header selection");
-    
+    // if(this.rowResizeHandler.isInRowResizeZone(x,y)) return; // Prevent conflict with row resizing
+   
     const container = document.getElementById("container")!;
     const scrollTop = container?.scrollTop;
 
@@ -78,7 +72,6 @@ export class RowMultiSelection {
       this.dragEndRow = row;
       const start = Math.min(this.dragStartRow, this.dragEndRow);
       const end = Math.max(this.dragStartRow, this.dragEndRow);
-
       this.grid.setRowRangeSelection(start, end);
       this.grid.redraw();
     }
@@ -89,12 +82,13 @@ export class RowMultiSelection {
    */
   public onMouseUp = (_e: MouseEvent) => {
     if ((this.canvas as any)._isRowResizing) return;
+
     if (this.isDragging) {
       this.isDragging = false;
-      this.selectionManager.suppressNextHeaderClick(); // Prevent conflict with header click logic
     }
   };
-    public destroy(): void {
+  
+  public destroy(): void {
       this.canvas.removeEventListener("mousedown", this.onMouseDown);
       this.canvas.removeEventListener("mousemove", this.onMouseMove);
       this.canvas.removeEventListener("mouseup", this.onMouseUp);

@@ -2,20 +2,13 @@
 
 import { CellEditor } from './cellEditor.js';
 import { Grid } from './grid.js';
-import { ResizeHandler } from './resizeHandler.js';
-import { RowResizeHandler } from './rowResizeHandler.js';
 import { generateSampleData } from './dataGenerator.js';
-import { ColumnSelectionHandler } from './ColumnMultiSelectionHandler.js';
-import { RowMultiSelection } from './RowMultiSelection.js';
 import { UndoManager } from './commands/UndoManager.js';
 import { InsertRowCommand } from './commands/InsertRowCommand.js';
 import { InsertColumnCommand } from './commands/InsertColumnCommand.js';
 import { DeleteRowCommand } from './commands/DeleteRowCommand.js';
 import { DeleteColumnCommand } from './commands/DeleteColumnCommand.js';
-import { SelectionManager } from './SelectionManager.js';
-// import { MouseEventCoordinator } from './MouseEventCoordinator .js';
-
-
+import { HandlerManager } from './HandlerManager.js';
 
 window.addEventListener("DOMContentLoaded", () => {
   /**
@@ -28,19 +21,16 @@ window.addEventListener("DOMContentLoaded", () => {
   canvas.height = canvas.clientHeight * dpr;
   ctx.scale(dpr, dpr);
   (canvas as any)._isResizing = false;
-  (canvas as any)._isRowResizing = false; // Add this line to track row resizing state
+  (canvas as any)._isRowResizing = false; 
+
   // Initialize grid and supporting classes
   const grid = new Grid(ctx, canvas);
   const undoManager = new UndoManager();
-
+   
   // Attach behaviors
   new CellEditor(canvas, grid, undoManager);
-  const selection = new SelectionManager(canvas,grid);
-  const resizeHandler = new ResizeHandler(canvas, grid, undoManager,selection);
-  new ColumnSelectionHandler(canvas, grid,selection,resizeHandler);
-  const rowResizeHandler =  new RowResizeHandler(canvas, grid, undoManager,selection);
-  new RowMultiSelection(canvas, grid,selection,rowResizeHandler);
-  
+  new HandlerManager(canvas, grid, undoManager);
+
   /**
    * Attach statistic buttons
    */
@@ -78,11 +68,11 @@ window.addEventListener("DOMContentLoaded", () => {
    * Undo/Redo keyboard shortcuts
    */
   document.addEventListener("keydown", (e) => {
-    if (e.ctrlKey && e.key === "z") {
-      undoManager.undo();
-    } else if (e.ctrlKey && e.key === "y") {
-      undoManager.redo();
-    }
+      if (e.ctrlKey && e.key === "z") {
+        undoManager.undo();
+      } else if (e.ctrlKey && e.key === "y") {
+        undoManager.redo();
+      }
   });
 
   document.getElementById("redo")!.addEventListener("click", () => {
@@ -92,6 +82,55 @@ window.addEventListener("DOMContentLoaded", () => {
   document.getElementById("undo")!.addEventListener("click", () => {
     undoManager.undo();
   });
+
+  // --- Copy-Paste Feature ---
+  let clipboardData: string[][] | null = null;
+  let clipboardRange: { startRow: number, startCol: number, endRow: number, endCol: number } | null = null;
+
+  document.addEventListener("keydown", (e) => {
+    // Avoid interfering with cell editor input
+    if (document.activeElement && (document.activeElement as HTMLElement).tagName === "INPUT") return;
+    // Copy (Ctrl+C)
+    if (e.ctrlKey && e.key.toLowerCase() === "c") {
+      const range = grid.getSelectedRange();
+      if (range) {
+        clipboardRange = { ...range };
+        clipboardData = [];
+        for (let i = range.startRow; i <= range.endRow; i++) {
+          const rowArr: string[] = [];
+          for (let j = range.startCol; j <= range.endCol; j++) {
+            rowArr.push(grid.getCellData(i, j) || "");
+          }
+          clipboardData.push(rowArr);
+        }
+        grid.enableCopyMode(range);
+      }
+      e.preventDefault();
+    }
+    // Paste (Ctrl+V)
+    if (e.ctrlKey && e.key.toLowerCase() === "v") {
+      if (clipboardData && clipboardRange) {
+        const sel = grid.getSelectedRange();
+        if (sel) {
+          const baseRow = sel.startRow;
+          const baseCol = sel.startCol;
+          for (let i = 0; i < clipboardData.length; i++) {
+            for (let j = 0; j < clipboardData[i].length; j++) {
+              grid.setCellData(baseRow + i, baseCol + j, clipboardData[i][j]);
+            }
+          }
+          grid.disableCopyMode();
+          grid.redraw();
+        }
+      }
+      e.preventDefault();
+    }
+    // Escape disables copy mode
+    if (e.key === "Escape") {
+      grid.disableCopyMode();
+    }
+  });
+  // --- End Copy-Paste Feature ---
 
   /**
    * Displays computed stats in UI

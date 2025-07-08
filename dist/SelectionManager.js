@@ -1,24 +1,27 @@
+/**
+ * Manages cell selection, column/row selection, drag selection,
+ * keyboard-based selection extension, and auto-scrolling during drag.
+ */
 export class SelectionManager {
     constructor(canvas, grid) {
         this.canvas = canvas;
         this.grid = grid;
+        // Selection state flags and tracking variables
         this.isDragging = false;
         this.dragStartRow = -1;
         this.dragStartCol = -1;
         this.suppressHeaderClick = 0;
         this.autoScrollInterval = null;
         this.lastMouseEvent = null;
+        // Anchor and initial coordinates for shift-based and drag selections
         this.anchorRow = null;
         this.anchorCol = null;
         this.startRowDown = null;
         this.startColDown = null;
+        // Handle mouse down to start drag selection
         this.handleMouseDown = (e) => {
-            if (this.canvas._isResizing)
+            if (this.canvas._isResizing || this.canvas._isRowResizing)
                 return;
-            console.log(this.canvas._isResizing);
-            if (this.canvas._isRowResizing)
-                return; // Prevent conflict with row resizing
-            console.log("SelectionManager onMouseDown");
             if (Date.now() < this.suppressHeaderClick)
                 return;
             const rect = this.canvas.getBoundingClientRect();
@@ -26,27 +29,31 @@ export class SelectionManager {
             const y = e.clientY - rect.top;
             const headerHeight = this.grid.rowHeights[0];
             const rowHeaderWidth = this.grid.colWidths[0];
+            // Only trigger selection if clicked inside grid body
             if (x >= rowHeaderWidth && y >= headerHeight) {
                 const { row, col } = this.grid.getCellFromCoordinates(x, y);
                 if (row > 0 && col > 0 && row < this.grid.totalRows && col < this.grid.totalCols) {
                     this.isDragging = true;
                     this.dragStartRow = row;
                     this.dragStartCol = col;
+                    // Clear row/column selections
                     this.grid.selectedColumn = null;
                     this.grid.selectedRow = null;
+                    this.grid.selectionMode = "cell"; // selectionMode is set
+                    // Set initial cell selection
                     this.grid.selectedCells = {
                         startRow: row,
                         startCol: col,
                         endRow: row,
                         endCol: col
                     };
-                    this.anchorRow = this.grid.selectedCells.startRow;
-                    this.anchorCol = this.grid.selectedCells.startCol;
-                    console.log(this.anchorCol + "anchor col");
-                    console.log(this.anchorRow + "anchor row");
-                    this.startColDown = this.anchorCol;
-                    this.startRowDown = this.anchorRow;
+                    // Set anchors for shift-based keyboard selection
+                    this.anchorRow = row;
+                    this.anchorCol = col;
+                    this.startRowDown = row;
+                    this.startColDown = col;
                     this.startAutoScroll();
+                    // Update stats if needed
                     if (this.grid.onStatsUpdateCallback) {
                         const stats = this.grid.computeSelectedCellStats();
                         this.grid.onStatsUpdateCallback(stats);
@@ -55,23 +62,26 @@ export class SelectionManager {
                 }
             }
         };
+        // Handle mouse move to update selection box
         this.handleMouseMove = (e) => {
             if (!this.isDragging)
                 return;
             this.lastMouseEvent = e;
             this.updateSelectionFromMouse(e.clientX, e.clientY);
         };
+        // End drag selection on mouse up
         this.handleMouseUp = (e) => {
             this.stopAutoScroll();
             if (this.isDragging) {
-                this.stopAutoScroll();
                 this.isDragging = false;
             }
         };
+        // Handle clicks on column/row headers or grid body
         this.handleClick = (e) => {
-            if (this.isDragging)
+            // If we are resizing, do not handle clicks
+            if (this.canvas._isResizing || this.canvas._isRowResizing)
                 return;
-            if (Date.now() < this.suppressHeaderClick)
+            if (this.isDragging || Date.now() < this.suppressHeaderClick)
                 return;
             const rect = this.canvas.getBoundingClientRect();
             const x = e.clientX - rect.left;
@@ -82,28 +92,31 @@ export class SelectionManager {
             const headerHeight = this.grid.rowHeights[0];
             const rowHeaderWidth = this.grid.colWidths[0];
             if (y < headerHeight && x >= rowHeaderWidth) {
+                // Clicked on column header
                 this.grid.selectedCells = null;
                 this.grid.selectedRow = null;
-                const adjustedX = x + scrollLeft;
-                const col = this.grid.getColFromX(adjustedX);
+                const col = this.grid.getColFromX(x + scrollLeft);
                 this.grid.selectedColumn = col > 0 ? col : null;
-                this.grid.redraw();
+                this.grid.selectionMode = "column"; // selectionMode is set
             }
             else if (x < rowHeaderWidth && y >= headerHeight) {
+                // Clicked on row header
                 this.grid.selectedCells = null;
                 this.grid.selectedColumn = null;
-                const adjustedY = y + scrollTop;
-                const row = this.grid.getRowFromY(adjustedY);
+                const row = this.grid.getRowFromY(y + scrollTop);
                 this.grid.selectedRow = row > 0 ? row : null;
-                this.grid.redraw();
+                this.grid.selectionMode = "row"; // selectionMode is set
             }
             else if (x < rowHeaderWidth && y < headerHeight) {
+                // Clicked on top-left cell
                 this.grid.selectedCells = null;
                 this.grid.selectedColumn = null;
                 this.grid.selectedRow = null;
-                this.grid.redraw();
+                this.grid.selectionMode = "cell"; // selectionMode is set
             }
+            this.grid.redraw();
         };
+        // Handle Shift+Arrow and Ctrl+Arrow based selection extension
         this.handleKeyDown = (e) => {
             if (!this.grid.selectedCells || !e.shiftKey)
                 return;
@@ -117,7 +130,7 @@ export class SelectionManager {
                         container.scrollTop = container.scrollHeight;
                         break;
                     case "ArrowUp":
-                        endRow = 1; // Assuming row 0 is header
+                        endRow = 1;
                         container.scrollTop = 0;
                         break;
                     case "ArrowRight":
@@ -125,11 +138,10 @@ export class SelectionManager {
                         container.scrollLeft = container.scrollWidth;
                         break;
                     case "ArrowLeft":
-                        endCol = 1; // Assuming col 0 is header
+                        endCol = 1;
                         container.scrollLeft = 0;
                         break;
-                    default:
-                        return;
+                    default: return;
                 }
             }
             else {
@@ -163,6 +175,7 @@ export class SelectionManager {
                 }
             }
             e.preventDefault();
+            // Update selected cell range
             this.grid.selectedCells = {
                 startRow: Math.min(this.anchorRow, endRow),
                 endRow: Math.max(this.anchorRow, endRow),
@@ -175,15 +188,18 @@ export class SelectionManager {
             }
             this.grid.redraw();
         };
+        // Attach event listeners
         this.canvas.addEventListener("mousedown", this.handleMouseDown);
         this.canvas.addEventListener("mousemove", this.handleMouseMove);
         this.canvas.addEventListener("mouseup", this.handleMouseUp);
         this.canvas.addEventListener("click", this.handleClick);
         document.addEventListener("keydown", this.handleKeyDown);
     }
+    // Temporarily suppress header click (to prevent conflict with resizing)
     suppressNextHeaderClick() {
         this.suppressHeaderClick = Date.now() + 60;
     }
+    // Update selection area during drag
     updateSelectionFromMouse(x, y) {
         const rect = this.canvas.getBoundingClientRect();
         const localX = x - rect.left;
@@ -192,11 +208,8 @@ export class SelectionManager {
         const rowHeaderWidth = this.grid.colWidths[0];
         if (localX >= rowHeaderWidth && localY >= headerHeight) {
             const { row, col } = this.grid.getCellFromCoordinates(localX, localY);
-            if (row > 0 &&
-                col > 0 &&
-                row < this.grid.totalRows &&
-                col < this.grid.totalCols &&
-                this.grid.selectedCells) {
+            if (row > 0 && col > 0 && row < this.grid.totalRows && col < this.grid.totalCols && this.grid.selectedCells) {
+                // Update selection bounds
                 this.grid.selectedCells.startRow = Math.min(this.dragStartRow, row);
                 this.grid.selectedCells.endRow = Math.max(this.dragStartRow, row);
                 this.grid.selectedCells.startCol = Math.min(this.dragStartCol, col);
@@ -209,59 +222,50 @@ export class SelectionManager {
             }
         }
     }
+    // Enable auto-scroll when dragging near canvas edge
     startAutoScroll() {
         if (this.autoScrollInterval !== null)
-            return; // Already running
-        // container: The scrollable container holding the canvas.
-        // scrollSpeed: How fast to scroll each tick (every 30ms).
-        // buffer: How close to the edge the mouse needs to be before scrolling starts.
-        // intervalTime: The speed of polling (smoothness of scrolling).
+            return;
         const container = document.getElementById("container");
-        const scrollSpeed = 30; // pixels per interval
-        const buffer = 50; // px from edge before it starts scrolling
-        const intervalTime = 20; // ms
+        const scrollSpeed = 30;
+        const buffer = 50;
+        const intervalTime = 20;
         this.autoScrollInterval = window.setInterval(() => {
-            if (!this.isDragging)
-                return;
-            if (!this.lastMouseEvent)
+            if (!this.isDragging || !this.lastMouseEvent)
                 return;
             const rect = this.canvas.getBoundingClientRect();
-            const mouseX = this.lastMouseEvent.clientX;
-            const mouseY = this.lastMouseEvent.clientY;
-            const dx = mouseX - rect.left;
-            const dy = mouseY - rect.top;
+            const dx = this.lastMouseEvent.clientX - rect.left;
+            const dy = this.lastMouseEvent.clientY - rect.top;
             let scrolled = false;
-            // Scroll down
             if (dy > container.clientHeight - buffer) {
                 container.scrollTop += scrollSpeed;
                 scrolled = true;
             }
-            // Scroll up
             if (dy < buffer) {
                 container.scrollTop -= scrollSpeed;
                 scrolled = true;
             }
-            // Scroll right
             if (dx > container.clientWidth - buffer) {
                 container.scrollLeft += scrollSpeed;
                 scrolled = true;
             }
-            // Scroll left
             if (dx < buffer) {
                 container.scrollLeft -= scrollSpeed;
                 scrolled = true;
             }
-            if (scrolled && this.lastMouseEvent) {
-                this.updateSelectionFromMouse(mouseX, mouseY);
+            if (scrolled) {
+                this.updateSelectionFromMouse(this.lastMouseEvent.clientX, this.lastMouseEvent.clientY);
             }
         }, intervalTime);
     }
+    // Stop auto-scroll
     stopAutoScroll() {
         if (this.autoScrollInterval !== null) {
             clearInterval(this.autoScrollInterval);
             this.autoScrollInterval = null;
         }
     }
+    // Cleanup listeners
     destroy() {
         this.canvas.removeEventListener("mousedown", this.handleMouseDown);
         this.canvas.removeEventListener("mousemove", this.handleMouseMove);

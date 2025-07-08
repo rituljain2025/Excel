@@ -1,6 +1,5 @@
 import { Grid } from "./grid.js";
-import { ResizeHandler } from "./resizeHandler.js";
-import { SelectionManager } from "./SelectionManager.js";
+
 
 /**
  * Handles mouse-based column range selection in the grid.
@@ -30,11 +29,7 @@ export class ColumnSelectionHandler {
    * @param {HTMLCanvasElement} canvas - The canvas where the grid is rendered.
    * @param {Grid} grid - The grid instance to manipulate column selection state.
    */
-  constructor(private canvas: HTMLCanvasElement, private grid: Grid,private selectionManager:SelectionManager,private resizeHandler: ResizeHandler) {
-    this.canvas.addEventListener("mousedown", this.onMouseDown);
-    this.canvas.addEventListener("mousemove", this.onMouseMove);
-    this.canvas.addEventListener("mouseup", this.onMouseUp);
-  }
+  constructor(private canvas: HTMLCanvasElement, private grid: Grid) {}
 
   /**
    * Triggered when the user presses the mouse button.
@@ -48,8 +43,7 @@ export class ColumnSelectionHandler {
     const rect = this.canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
-    // Prevent selection if in resize zone
-    if (this.resizeHandler.isInResizeZone(x, y)) return;
+  
 
     const container = document.getElementById("container")!;
     const scrollLeft = container.scrollLeft;
@@ -58,17 +52,17 @@ export class ColumnSelectionHandler {
 
     // Only allow selection if clicking inside the column header area
     if (y < headerHeight && x >= rowHeaderWidth) {
-      const adjustedX = x + scrollLeft;
-      const col = this.grid.getColFromX(adjustedX);
-      if (col > 0) {
-        this.isDragging = true;
-        this.startCol = this.endCol = col;
-        this.grid.clearSelection();
-        console.log("column clicked");
+        const adjustedX = x + scrollLeft;
+        const col = this.grid.getColFromX(adjustedX);
+        if (col > 0) {
+          
+          this.isDragging = true;
+          this.startCol = this.endCol = col;
+          this.grid.clearSelection();
         
-        this.grid.setColumnRangeSelection(this.startCol, this.endCol);
-        this.grid.redraw();
-      }
+          this.grid.setColumnRangeSelection(this.startCol, this.endCol);
+          this.grid.redraw();
+        }
     }
   };
 
@@ -105,18 +99,19 @@ export class ColumnSelectionHandler {
    */
   public onMouseUp = (_e: MouseEvent) => {
     if (this.isDragging) {
-      this.isDragging = false;
-      this.selectionManager.suppressNextHeaderClick(); // Prevents interference with click-based selection
-      if (this.grid.onStatsUpdateCallback) {
-          const stats = this.grid.computeSelectedCellStats();
-          this.grid.onStatsUpdateCallback(stats);
-      }
-      console.log("Column range selected:", this.startCol, "to", this.endCol);
+        this.isDragging = false;
+      
+        if (this.grid.onStatsUpdateCallback) {
+            const stats = this.grid.computeSelectedCellStats();
+            this.grid.onStatsUpdateCallback(stats);
+        }
+     
     }
   };
+
   public destroy(): void {
     this.canvas.removeEventListener("mousedown", this.onMouseDown);
     this.canvas.removeEventListener("mousemove", this.onMouseMove);
     this.canvas.removeEventListener("mouseup", this.onMouseUp);
-}
+  }
 }

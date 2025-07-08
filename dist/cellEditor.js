@@ -1,4 +1,5 @@
 import { EditCellCommand } from "./commands/EditCellCommand.js";
+import { FormulaEvaluator } from "./FormulaEvaluator.js";
 /**
  * Handles in-place editing of cells in the grid using a double-click event.
  * Integrates with the command pattern via EditCellCommand and UndoManager for undo-redo support.
@@ -25,6 +26,8 @@ export class CellEditor {
             const rect = this.canvas.getBoundingClientRect();
             const x = e.clientX - rect.left;
             const y = e.clientY - rect.top;
+            if (x <= this.grid.getColWidth(0) || y <= this.grid.getRowHeight(0))
+                return; // Ignore clicks in header area
             const container = document.getElementById("container");
             const scrollTop = container.scrollTop;
             const scrollLeft = container.scrollLeft;
@@ -76,6 +79,48 @@ export class CellEditor {
             // Attach the input to the DOM and focus it
             document.body.appendChild(input);
             input.focus();
+            // --- Formula range highlight logic ---
+            let lastHighlightedRange = null;
+            const formulaEvaluator = new FormulaEvaluator(() => ""); // dummy getCellData
+            function tryHighlightFormulaRange(val) {
+                const formula = val.trim();
+                // This regex will match formulas like `=sum(d6,d9)`, `=min(a1,a5)`, `=max(b2,b4)`, `=avg(c3,c7)`, etc.
+                // `match[1]` will be the function name (e.g., `SUM`, `MIN`, etc.)
+                // `match[2]` and `match[3]` will be the two cell references.
+                const match = formula.match(/^=\s*([a-zA-Z]+)\(([^,]+),([^\)]+)\)/i);
+                if (match) {
+                    const funcName = match[1].trim().toUpperCase();
+                    const ref1 = match[2].trim().toUpperCase();
+                    const ref2 = match[3].trim().toUpperCase();
+                    const pos1 = formulaEvaluator["cellLabelToIndex"](ref1);
+                    const pos2 = formulaEvaluator["cellLabelToIndex"](ref2);
+                    if (pos1.row > 0 && pos1.col > 0 && pos2.row > 0 && pos2.col > 0) {
+                        // Compute min/max for range
+                        const startRow = Math.min(pos1.row, pos2.row);
+                        const endRow = Math.max(pos1.row, pos2.row);
+                        const startCol = Math.min(pos1.col, pos2.col);
+                        const endCol = Math.max(pos1.col, pos2.col);
+                        lastHighlightedRange = { startRow, startCol, endRow, endCol };
+                        // Highlight
+                        this.grid.setCellRangeSelection(startRow, startCol, endRow, endCol);
+                        this.grid.redraw();
+                        return;
+                    }
+                }
+                // If not a valid formula, clear highlight
+                if (lastHighlightedRange) {
+                    this.grid.clearSelection();
+                    this.grid.redraw();
+                    lastHighlightedRange = null;
+                }
+            }
+            // Bind input event for formula highlighting
+            input.addEventListener("input", (event) => {
+                tryHighlightFormulaRange.call(this, input.value);
+            });
+            // Initial check in case cell already has formula
+            tryHighlightFormulaRange.call(this, input.value);
+            // --- End formula range highlight logic ---
             /**
              * Saves the new value and cleans up the input field.
              * If the value was changed, it creates and executes an EditCellCommand.
@@ -83,6 +128,12 @@ export class CellEditor {
             const saveAndCleanup = () => {
                 const newValue = input.value;
                 const oldValue = this.grid.getCellData(row, col) || "";
+                // Remove highlight on blur
+                if (lastHighlightedRange) {
+                    this.grid.clearSelection();
+                    this.grid.redraw();
+                    lastHighlightedRange = null;
+                }
                 if (newValue !== oldValue) {
                     const cmd = new EditCellCommand(this.grid, row, col, oldValue, newValue);
                     this.undoManager.executeCommand(cmd);

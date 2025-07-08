@@ -6,11 +6,9 @@ export class RowMultiSelection {
      * @param canvas The HTML canvas used for drawing the grid
      * @param grid The Grid instance representing the data and drawing logic
      */
-    constructor(canvas, grid, selectionManager, rowResizeHandler) {
+    constructor(canvas, grid) {
         this.canvas = canvas;
         this.grid = grid;
-        this.selectionManager = selectionManager;
-        this.rowResizeHandler = rowResizeHandler;
         /** Whether a row selection drag operation is currently in progress */
         this.isDragging = false;
         /** The row index where the drag started */
@@ -23,13 +21,10 @@ export class RowMultiSelection {
         this.onMouseDown = (e) => {
             if (this.canvas._isRowResizing)
                 return;
-            console.log("RowMultiSelection onMouseDown");
             const rect = this.canvas.getBoundingClientRect();
             const x = e.clientX - rect.left;
             const y = e.clientY - rect.top;
-            if (this.rowResizeHandler.isInRowResizeZone(x, y))
-                return; // Prevent conflict with row resizing
-            console.log("checking row header selection");
+            // if(this.rowResizeHandler.isInRowResizeZone(x,y)) return; // Prevent conflict with row resizing
             const container = document.getElementById("container");
             const scrollTop = container?.scrollTop;
             const headerWidth = this.grid.getColWidth(0);
@@ -77,12 +72,8 @@ export class RowMultiSelection {
                 return;
             if (this.isDragging) {
                 this.isDragging = false;
-                this.selectionManager.suppressNextHeaderClick(); // Prevent conflict with header click logic
             }
         };
-        this.canvas.addEventListener("mousedown", this.onMouseDown);
-        this.canvas.addEventListener("mousemove", this.onMouseMove);
-        this.canvas.addEventListener("mouseup", this.onMouseUp);
     }
     destroy() {
         this.canvas.removeEventListener("mousedown", this.onMouseDown);

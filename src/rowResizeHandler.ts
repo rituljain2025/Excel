@@ -1,7 +1,6 @@
 import { ResizeRowCommand } from "./commands/ResizeRowCommand.js";
 import { Grid } from "./grid.js";
 import { UndoManager } from "./commands/UndoManager.js";
-import { SelectionManager } from "./SelectionManager.js";
 
 
 /**
@@ -26,30 +25,19 @@ export class RowResizeHandler {
   /** Tracks the final height of the row being resized */
   private currentRowHeight: number = 0;
 
+  /** Whether multi-row resize is enabled */
+  private isMultiRowResize: boolean = false;
+
   /**
    * @param canvas The canvas element used for rendering the grid
    * @param grid The Grid instance for cell data and rendering
    * @param undoManager The UndoManager to support undo-redo of row resizing
    */
   constructor(
-    private canvas: HTMLCanvasElement,
-    private grid: Grid,
-    private undoManager: UndoManager,
-    private selectionManager:SelectionManager,
- 
-  ) {
-    this.setupEventListeners();
-  }
+      private canvas: HTMLCanvasElement,
+      private grid: Grid,
+      private undoManager: UndoManager) {}
 
-  /**
-   * Adds necessary mouse event listeners to the canvas
-   */
-  private setupEventListeners() {
-    this.canvas.addEventListener("mousedown", this.onMouseDown);
-    this.canvas.addEventListener("mousemove", this.onMouseMove);
-    this.canvas.addEventListener("mouseleave", this.onMouseLeave);
-    this.canvas.style.cursor = "default";
-  }
 
   /**
    * Calculates the visible range of rows in the canvas based on scroll position
@@ -106,17 +94,25 @@ export class RowResizeHandler {
       const rowBottom = relativeY + rowHeight;
 
       if (y >= rowBottom - 5 && y <= rowBottom + 5) {
+        // Determine if multi-row resize should be enabled
+        let isMultiRowSelected = false;
+        if (
+          this.grid.selectionMode === "row" &&
+          this.grid.selectedCells &&
+          this.grid.selectedCells.startRow !== this.grid.selectedCells.endRow &&
+          i >= this.grid.selectedCells.startRow &&
+          i <= this.grid.selectedCells.endRow
+        ) {
+          isMultiRowSelected = true;
+        }
+        this.isMultiRowResize = isMultiRowSelected;
         this.isResizing = true;
         (this.canvas as any)._isRowResizing = true;
-        console.log( (this.canvas as any)._isRowResizing);
-        
         this.startY = y;
         this.startHeight = rowHeight;
         this.targetRow = i;
         this.currentRowHeight = rowHeight;
-
         this.canvas.style.cursor = "row-resize";
-
         document.addEventListener("mousemove", this.onMouseMoveResize);
         document.addEventListener("mouseup", this.onMouseUp);
         e.preventDefault();
@@ -190,10 +186,15 @@ export class RowResizeHandler {
     const delta = currentY - this.startY;
     const newHeight = this.startHeight + delta;
 
-    this.selectionManager.suppressNextHeaderClick();
-
+   
     if (newHeight >= 20 && newHeight <= 200) {
-      this.grid.setRowHeight(this.targetRow, newHeight);
+      if (this.isMultiRowResize && this.grid.selectedCells) {
+        for (let row = this.grid.selectedCells.startRow; row <= this.grid.selectedCells.endRow; row++) {
+          this.grid.setRowHeight(row, newHeight);
+        }
+      } else {
+        this.grid.setRowHeight(this.targetRow, newHeight);
+      }
       this.currentRowHeight = newHeight;
     }
   };
@@ -203,15 +204,18 @@ export class RowResizeHandler {
    */
   public onMouseUp = (e: MouseEvent) => {
     if (this.isResizing) {
-       
-      if (this.startHeight !== this.currentRowHeight) {
-        const cmd = new ResizeRowCommand(
-          this.grid,
-          this.startHeight,
-          this.currentRowHeight,
-          this.targetRow
-        );
-        this.undoManager.executeCommand(cmd);
+      if(this.startHeight !== this.currentRowHeight){
+        if (this.isMultiRowResize && this.grid.selectedCells) {
+          for (let row = this.grid.selectedCells.startRow; row <= this.grid.selectedCells.endRow; row++) {
+            this.grid.setRowHeight(row, this.startHeight); // reset for undo consistency
+            const cmd = new ResizeRowCommand(this.grid, this.startHeight, this.currentRowHeight, row);
+            this.undoManager.executeCommand(cmd);
+          }
+        } else {
+          this.grid.setRowHeight(this.targetRow, this.startHeight); // reset for undo consistency
+          const cmd = new ResizeRowCommand(this.grid, this.startHeight, this.currentRowHeight, this.targetRow);
+          this.undoManager.executeCommand(cmd);
+        }
       }
       (this.canvas as any)._isRowResizing = false;
       this.isResizing = false;
@@ -219,11 +223,11 @@ export class RowResizeHandler {
       this.currentRowHeight = 0;
       this.canvas.style.cursor = "default";
       this.isHovering = false;
-      this.selectionManager.suppressNextHeaderClick();
       document.removeEventListener("mousemove", this.onMouseMoveResize);
       document.removeEventListener("mouseup", this.onMouseUp);
     }
   };
+
   public isInRowResizeZone(x: number, y: number): boolean {
     const rowHeaderWidth = this.grid.getColWidth(0);
     if (x > rowHeaderWidth) return false;

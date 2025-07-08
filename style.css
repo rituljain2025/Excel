@@ -37,7 +37,7 @@
 }
 
 
-#container {
+ #container { 
     width: 100vw;
     margin-top: 75px;
     height:calc(100vh - 75px) ;
@@ -45,7 +45,7 @@
     position: relative;
     padding-top: 100px; 
     padding-right: 10px;
-    
+   
 }
 
 
@@ -59,7 +59,7 @@
     width: calc(100vw - 15px);
     height: calc(100vh - 75px);
     
-}
+} 
 button{
   background-color: white;
   color:#242424;

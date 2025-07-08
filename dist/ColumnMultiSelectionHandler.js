@@ -8,11 +8,9 @@ export class ColumnSelectionHandler {
      * @param {HTMLCanvasElement} canvas - The canvas where the grid is rendered.
      * @param {Grid} grid - The grid instance to manipulate column selection state.
      */
-    constructor(canvas, grid, selectionManager, resizeHandler) {
+    constructor(canvas, grid) {
         this.canvas = canvas;
         this.grid = grid;
-        this.selectionManager = selectionManager;
-        this.resizeHandler = resizeHandler;
         /**
          * Indicates whether a drag operation is in progress.
          * @type {boolean}
@@ -41,9 +39,6 @@ export class ColumnSelectionHandler {
             const rect = this.canvas.getBoundingClientRect();
             const x = e.clientX - rect.left;
             const y = e.clientY - rect.top;
-            // Prevent selection if in resize zone
-            if (this.resizeHandler.isInResizeZone(x, y))
-                return;
             const container = document.getElementById("container");
             const scrollLeft = container.scrollLeft;
             const headerHeight = this.grid.getRowHeight(0);
@@ -56,7 +51,6 @@ export class ColumnSelectionHandler {
                     this.isDragging = true;
                     this.startCol = this.endCol = col;
                     this.grid.clearSelection();
-                    console.log("column clicked");
                     this.grid.setColumnRangeSelection(this.startCol, this.endCol);
                     this.grid.redraw();
                 }
@@ -94,17 +88,12 @@ export class ColumnSelectionHandler {
         this.onMouseUp = (_e) => {
             if (this.isDragging) {
                 this.isDragging = false;
-                this.selectionManager.suppressNextHeaderClick(); // Prevents interference with click-based selection
                 if (this.grid.onStatsUpdateCallback) {
                     const stats = this.grid.computeSelectedCellStats();
                     this.grid.onStatsUpdateCallback(stats);
                 }
-                console.log("Column range selected:", this.startCol, "to", this.endCol);
             }
         };
-        this.canvas.addEventListener("mousedown", this.onMouseDown);
-        this.canvas.addEventListener("mousemove", this.onMouseMove);
-        this.canvas.addEventListener("mouseup", this.onMouseUp);
     }
     destroy() {
         this.canvas.removeEventListener("mousedown", this.onMouseDown);

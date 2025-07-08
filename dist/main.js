@@ -1,18 +1,13 @@
 // main.ts (Entry Point for Excel-like Grid App)
 import { CellEditor } from './cellEditor.js';
 import { Grid } from './grid.js';
-import { ResizeHandler } from './resizeHandler.js';
-import { RowResizeHandler } from './rowResizeHandler.js';
 import { generateSampleData } from './dataGenerator.js';
-import { ColumnSelectionHandler } from './ColumnMultiSelectionHandler.js';
-import { RowMultiSelection } from './RowMultiSelection.js';
 import { UndoManager } from './commands/UndoManager.js';
 import { InsertRowCommand } from './commands/InsertRowCommand.js';
 import { InsertColumnCommand } from './commands/InsertColumnCommand.js';
 import { DeleteRowCommand } from './commands/DeleteRowCommand.js';
 import { DeleteColumnCommand } from './commands/DeleteColumnCommand.js';
-import { SelectionManager } from './SelectionManager.js';
-// import { MouseEventCoordinator } from './MouseEventCoordinator .js';
+import { HandlerManager } from './HandlerManager.js';
 window.addEventListener("DOMContentLoaded", () => {
     /**
      * Setup canvas with proper device pixel ratio scaling
@@ -24,17 +19,13 @@ window.addEventListener("DOMContentLoaded", () => {
     canvas.height = canvas.clientHeight * dpr;
     ctx.scale(dpr, dpr);
     canvas._isResizing = false;
-    canvas._isRowResizing = false; // Add this line to track row resizing state
+    canvas._isRowResizing = false;
     // Initialize grid and supporting classes
     const grid = new Grid(ctx, canvas);
     const undoManager = new UndoManager();
     // Attach behaviors
     new CellEditor(canvas, grid, undoManager);
-    const selection = new SelectionManager(canvas, grid);
-    const resizeHandler = new ResizeHandler(canvas, grid, undoManager, selection);
-    new ColumnSelectionHandler(canvas, grid, selection, resizeHandler);
-    const rowResizeHandler = new RowResizeHandler(canvas, grid, undoManager, selection);
-    new RowMultiSelection(canvas, grid, selection, rowResizeHandler);
+    new HandlerManager(canvas, grid, undoManager);
     /**
      * Attach statistic buttons
      */
@@ -79,6 +70,54 @@ window.addEventListener("DOMContentLoaded", () => {
     document.getElementById("undo").addEventListener("click", () => {
         undoManager.undo();
     });
+    // --- Copy-Paste Feature ---
+    let clipboardData = null;
+    let clipboardRange = null;
+    document.addEventListener("keydown", (e) => {
+        // Avoid interfering with cell editor input
+        if (document.activeElement && document.activeElement.tagName === "INPUT")
+            return;
+        // Copy (Ctrl+C)
+        if (e.ctrlKey && e.key.toLowerCase() === "c") {
+            const range = grid.getSelectedRange();
+            if (range) {
+                clipboardRange = { ...range };
+                clipboardData = [];
+                for (let i = range.startRow; i <= range.endRow; i++) {
+                    const rowArr = [];
+                    for (let j = range.startCol; j <= range.endCol; j++) {
+                        rowArr.push(grid.getCellData(i, j) || "");
+                    }
+                    clipboardData.push(rowArr);
+                }
+                grid.enableCopyMode(range);
+            }
+            e.preventDefault();
+        }
+        // Paste (Ctrl+V)
+        if (e.ctrlKey && e.key.toLowerCase() === "v") {
+            if (clipboardData && clipboardRange) {
+                const sel = grid.getSelectedRange();
+                if (sel) {
+                    const baseRow = sel.startRow;
+                    const baseCol = sel.startCol;
+                    for (let i = 0; i < clipboardData.length; i++) {
+                        for (let j = 0; j < clipboardData[i].length; j++) {
+                            grid.setCellData(baseRow + i, baseCol + j, clipboardData[i][j]);
+                        }
+                    }
+                    grid.disableCopyMode();
+                    grid.redraw();
+                }
+            }
+            e.preventDefault();
+        }
+        // Escape disables copy mode
+        if (e.key === "Escape") {
+            grid.disableCopyMode();
+        }
+    });
+    // --- End Copy-Paste Feature ---
     /**
      * Displays computed stats in UI
      * @param {string} text - The stat output string

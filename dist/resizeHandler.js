@@ -1,4 +1,5 @@
 import { ResizeColumnCommand } from './commands/ResizeColumnCommand.js';
+import { MultiCommand } from './commands/command.js';
 /**
  * Handles resizing of columns in the grid when the user drags near column edges.
  */
@@ -8,11 +9,10 @@ export class ResizeHandler {
      * @param grid Grid instance to manipulate column widths
      * @param undoManager UndoManager to support undo/redo functionality
      */
-    constructor(canvas, grid, undoManager, selectionManager) {
+    constructor(canvas, grid, undoManager) {
         this.canvas = canvas;
         this.grid = grid;
         this.undoManager = undoManager;
-        this.selectionManager = selectionManager;
         /** Whether a resize operation is in progress */
         this.isResizing = false;
         /** X-coordinate where resize started */
@@ -25,6 +25,7 @@ export class ResizeHandler {
         this.isHovering = false;
         /** Final width during active resize drag (used for undo command) */
         this.currentNewWidth = 0;
+        this.isMultiColResize = false;
         /**
          * Handles mouse down event to initiate resizing if user clicks near column edge
          */
@@ -36,15 +37,24 @@ export class ResizeHandler {
                 return;
             const border = this.findResizableBorder(x);
             if (border) {
+                // Determine if multi-column resize should be enabled
+                let isMultiColSelected = false;
+                if (this.grid.selectionMode === "column" &&
+                    this.grid.selectedCells &&
+                    this.grid.selectedCells.startCol !== this.grid.selectedCells.endCol &&
+                    border.col >= this.grid.selectedCells.startCol &&
+                    border.col <= this.grid.selectedCells.endCol) {
+                    isMultiColSelected = true;
+                }
                 this.canvas._isResizing = true;
                 this.isResizing = true;
                 this.resizingColIndex = border.col;
                 this.startX = x;
                 this.startWidth = this.grid.getColWidth(border.col);
                 this.canvas.style.cursor = "col-resize";
+                this.isMultiColResize = isMultiColSelected;
                 window.addEventListener("mousemove", this.onMouseMoveResize);
                 window.addEventListener("mouseup", this.onMouseUp);
-                this.selectionManager.suppressNextHeaderClick();
                 e.preventDefault();
                 e.stopPropagation();
                 e.stopImmediatePropagation();
@@ -61,7 +71,16 @@ export class ResizeHandler {
             const delta = currentX - this.startX;
             const newWidth = this.startWidth + delta;
             if (newWidth >= 30 && newWidth <= 500) {
-                this.grid.setColWidth(this.resizingColIndex, newWidth);
+                if (this.isMultiColResize && this.grid.selectedCells) {
+                    // Multi-column resize: update all selected columns visually during drag
+                    for (let col = this.grid.selectedCells.startCol; col <= this.grid.selectedCells.endCol; col++) {
+                        this.grid.setColWidth(col, newWidth);
+                    }
+                }
+                else {
+                    // Single column resize
+                    this.grid.setColWidth(this.resizingColIndex, newWidth);
+                }
                 this.currentNewWidth = newWidth;
             }
         };
@@ -78,16 +97,35 @@ export class ResizeHandler {
                 this.resizingColIndex = -1;
                 this.currentNewWidth = 0;
                 if (oldWidth !== newWidth && newWidth >= 30 && newWidth <= 500) {
-                    this.grid.setColWidth(colIndex, oldWidth); // reset for undo consistency
-                    const cmd = new ResizeColumnCommand(this.grid, colIndex, newWidth);
-                    this.undoManager.executeCommand(cmd);
+                    if (this.isMultiColResize && this.grid.selectedCells) {
+                        // Only multi-resize if pointer down was on multi-selected area
+                        const commands = [];
+                        for (let col = this.grid.selectedCells.startCol; col <= this.grid.selectedCells.endCol; col++) {
+                            this.grid.setColWidth(col, newWidth);
+                            commands.push(new ResizeColumnCommand(this.grid, col, newWidth));
+                        }
+                        this.undoManager.executeCommand(new MultiCommand(commands));
+                        setTimeout(() => {
+                            this.grid.selectedCells = {
+                                startRow: this.grid.selectedCells.startRow,
+                                endRow: this.grid.selectedCells.endRow,
+                                startCol: this.grid.selectedCells.startCol,
+                                endCol: this.grid.selectedCells.endCol
+                            };
+                            this.grid.redraw();
+                        }, 0);
+                    }
+                    else {
+                        this.grid.setColWidth(colIndex, oldWidth); // reset for undo consistency
+                        const cmd = new ResizeColumnCommand(this.grid, colIndex, newWidth);
+                        this.undoManager.executeCommand(cmd);
+                    }
                 }
                 this.canvas.style.cursor = "default";
                 document.body.style.cursor = "default";
                 this.isHovering = false;
                 window.removeEventListener("mousemove", this.onMouseMoveResize);
                 window.removeEventListener("mouseup", this.onMouseUp);
-                this.selectionManager.suppressNextHeaderClick();
             }
         };
         /**
@@ -129,9 +167,6 @@ export class ResizeHandler {
                 this.isHovering = false;
             }
         };
-        this.canvas.addEventListener("mousedown", this.onMouseDown);
-        this.canvas.addEventListener("mousemove", this.onMouseMove);
-        this.canvas.addEventListener("mouseleave", this.onMouseLeave);
     }
     /**
      * Checks if the y-position is within the column header area
