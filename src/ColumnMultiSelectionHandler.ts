@@ -38,12 +38,18 @@ export class ColumnSelectionHandler {
    * 
    * @param {MouseEvent} e - The mouse down event.
    */
+  public isInMultiColumnResizeZone(x: number, y: number): boolean {
+    const headerHeight = this.grid.getRowHeight(0);
+    const col = this.grid.getColFromX(x);
+    const colWidth = this.grid.getColWidth(col);
+    return y < headerHeight && x >= colWidth;
+  }
+
   public onMouseDown = (e: MouseEvent) => {
     if ((this.canvas as any)._isResizing) return;
     const rect = this.canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-  
+    const x = (e.clientX - rect.left) / this.grid.zoom; // Adjust for zoom
+    const y = (e.clientY - rect.top) / this.grid.zoom; // Adjust for zoom
 
     const container = document.getElementById("container")!;
     const scrollLeft = container.scrollLeft;
@@ -55,11 +61,8 @@ export class ColumnSelectionHandler {
         const adjustedX = x + scrollLeft;
         const col = this.grid.getColFromX(adjustedX);
         if (col > 0) {
-          
           this.isDragging = true;
           this.startCol = this.endCol = col;
-          this.grid.clearSelection();
-        
           this.grid.setColumnRangeSelection(this.startCol, this.endCol);
           this.grid.redraw();
         }
@@ -74,13 +77,14 @@ export class ColumnSelectionHandler {
    */
   public onMouseMove = (e: MouseEvent) => {
     if (!this.isDragging) return;
-
+   
     const rect = this.canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
+    const x = (e.clientX - rect.left) / this.grid.zoom; // Adjust for zoom
     const container = document.getElementById("container")!;
     const scrollLeft = container.scrollLeft;
     const adjustedX = x + scrollLeft;
-
+    
+    
     const col = this.grid.getColFromX(adjustedX);
     if (col > 0) {
       this.endCol = col;

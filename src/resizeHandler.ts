@@ -31,7 +31,7 @@ export class ResizeHandler {
   /**
    * Checks if the y-position is within the column header area
    */
-  private isInColumnHeader(y: number): boolean {
+  public isInColumnHeader(y: number): boolean {
     const headerHeight = this.grid.getRowHeight(0);
     return y >= 0 && y <= headerHeight;
   }
@@ -42,7 +42,7 @@ export class ResizeHandler {
   private findResizableBorder(x: number): { col: number; borderX: number } | null {
     const container = document.getElementById("container")!;
     const scrollLeft = container.scrollLeft;
-    const adjustedX = x + scrollLeft;
+    const adjustedX = x + scrollLeft; // Adjust for zoom level
     let cumulativeX = 0;
 
     const totalCols = this.grid.totalCols || 500;
@@ -76,8 +76,8 @@ export class ResizeHandler {
    */
   private onMouseDown = (e: MouseEvent) => {
     const rect = this.canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const x = (e.clientX - rect.left) / this.grid.zoom;
+    const y = (e.clientY - rect.top) / this.grid.zoom;
 
     if (!this.isInColumnHeader(y)) return;
 
@@ -116,7 +116,7 @@ export class ResizeHandler {
   private onMouseMoveResize = (e: MouseEvent) => {
     if (!this.isResizing || this.resizingColIndex === -1) return;
     const rect = this.canvas.getBoundingClientRect();
-    const currentX = e.clientX - rect.left;
+    const currentX = (e.clientX - rect.left) / this.grid.zoom;
     const delta = currentX - this.startX;
     const newWidth = this.startWidth + delta;
     if (newWidth >= 30 && newWidth <= 500) {
@@ -185,8 +185,8 @@ export class ResizeHandler {
     if (this.isResizing) return;
 
     const rect = this.canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const x =( e.clientX - rect.left) / this.grid.zoom;
+    const y = (e.clientY - rect.top) / this.grid.zoom;
 
     if (!this.isInColumnHeader(y)) {
       if (this.isHovering) {

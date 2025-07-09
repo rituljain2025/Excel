@@ -31,8 +31,8 @@ export class RowResizeHandler {
          */
         this.onMouseDown = (e) => {
             const rect = this.canvas.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
+            const x = (e.clientX - rect.left) / this.grid.zoom;
+            const y = (e.clientY - rect.top) / this.grid.zoom;
             const container = document.getElementById("container");
             const scrollTop = container.scrollTop;
             const rowHeaderWidth = this.grid.getColWidth(0);
@@ -78,8 +78,8 @@ export class RowResizeHandler {
             if (this.isResizing)
                 return;
             const rect = this.canvas.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
+            const x = (e.clientX - rect.left) / this.grid.zoom;
+            const y = (e.clientY - rect.top) / this.grid.zoom;
             const container = document.getElementById("container");
             const scrollTop = container.scrollTop;
             const rowHeaderWidth = this.grid.getColWidth(0);
@@ -123,7 +123,7 @@ export class RowResizeHandler {
             if (!this.isResizing)
                 return;
             const rect = this.canvas.getBoundingClientRect();
-            const currentY = e.clientY - rect.top;
+            const currentY = (e.clientY - rect.top) / this.grid.zoom;
             const delta = currentY - this.startY;
             const newHeight = this.startHeight + delta;
             if (newHeight >= 20 && newHeight <= 200) {

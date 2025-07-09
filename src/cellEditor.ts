@@ -20,6 +20,7 @@ export class CellEditor {
     private undoManager: UndoManager
   ) {
     this.canvas.addEventListener("dblclick", this.onDoubleClick); 
+    
   }
 
   /**
@@ -32,8 +33,8 @@ export class CellEditor {
   private onDoubleClick = (e: MouseEvent) => {
     
     const rect = this.canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const x = (e.clientX - rect.left) / this.grid.zoom; // Adjust for zoom
+    const y = (e.clientY - rect.top) / this.grid.zoom; // Adjust for zoom
     if(x <= this.grid.getColWidth(0) || y <= this.grid.getRowHeight(0)) return; // Ignore clicks in header area
 
     const container = document.getElementById("container")!;
@@ -77,11 +78,11 @@ export class CellEditor {
     input.type = "text";
     input.value = this.grid.getCellData(row, col) || "";
     input.style.position = "absolute";
-    input.style.left = `${cellX - scrollLeft + rect.left}px`;
-    input.style.top = `${cellY - scrollTop + rect.top}px`;
-    input.style.width = `${cellW}px`;
-    input.style.height = `${cellH }px`;
-    input.style.fontSize = "12px";
+    input.style.left = `${(cellX - scrollLeft) * this.grid.zoom + rect.left}px`;
+    input.style.top = `${(cellY - scrollTop) * this.grid.zoom + rect.top}px`;
+    input.style.width = `${cellW * this.grid.zoom}px`;
+    input.style.height = `${cellH * this.grid.zoom}px`;
+    input.style.fontSize = `${12 * this.grid.zoom}px`;
     input.style.border = "2px solid #137e41";
     input.style.outline = "none";
     input.style.fontFamily = "Arial, sans-serif";
@@ -175,6 +176,5 @@ export class CellEditor {
       }
     });
   };
-
 
 }

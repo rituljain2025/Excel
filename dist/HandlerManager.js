@@ -11,6 +11,11 @@ export class HandlerManager {
         this.undoManager = undoManager;
         this.currentHandler = null;
         this.currentType = "none";
+        this.resizeColumnHandler = null;
+        this.rowResizeHandler = null;
+        this.columnSelectionHandler = null;
+        this.rowMultiSelection = null;
+        this.selectionManager = null;
         this.onMouseDown = (e) => {
             const type = this.determineHandlerType(e);
             if (type !== this.currentType) {
@@ -20,10 +25,15 @@ export class HandlerManager {
                 this.currentHandler.onMouseDown(e);
             }
         };
+        this.onKeyDown = (e) => {
+            if (this.currentHandler && this.currentHandler.handleKeyDown) {
+                this.currentHandler.handleKeyDown(e);
+            }
+        };
         this.onMouseMove = (e) => {
             const rect = this.canvas.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
+            const x = (e.clientX - rect.left) / this.grid.zoom;
+            const y = (e.clientY - rect.top) / this.grid.zoom;
             if (this.isInColumnResizeZone(x, y)) {
                 this.canvas.style.cursor = "col-resize";
             }
@@ -47,6 +57,11 @@ export class HandlerManager {
                 this.currentHandler.onMouseLeave(e);
             }
         };
+        this.resizeColumnHandler = new ResizeHandler(this.canvas, this.grid, this.undoManager);
+        this.rowResizeHandler = new RowResizeHandler(this.canvas, this.grid, this.undoManager);
+        this.columnSelectionHandler = new ColumnSelectionHandler(this.canvas, this.grid);
+        this.rowMultiSelection = new RowMultiSelection(this.canvas, this.grid);
+        this.selectionManager = new SelectionManager(this.canvas, this.grid);
         this.attach();
     }
     attach() {
@@ -54,6 +69,7 @@ export class HandlerManager {
         this.canvas.addEventListener("mousemove", this.onMouseMove);
         this.canvas.addEventListener("mouseup", this.onMouseUp);
         this.canvas.addEventListener("mouseleave", this.onMouseLeave);
+        document.addEventListener("keydown", this.onKeyDown);
     }
     switchHandler(type) {
         if (this.currentHandler && this.currentHandler.destroy) {
@@ -62,19 +78,19 @@ export class HandlerManager {
         this.currentType = type;
         switch (type) {
             case "resize-column":
-                this.currentHandler = new ResizeHandler(this.canvas, this.grid, this.undoManager);
+                this.currentHandler = this.resizeColumnHandler;
                 break;
             case "resize-row":
-                this.currentHandler = new RowResizeHandler(this.canvas, this.grid, this.undoManager);
+                this.currentHandler = this.rowResizeHandler;
                 break;
             case "select-column":
-                this.currentHandler = new ColumnSelectionHandler(this.canvas, this.grid);
+                this.currentHandler = this.columnSelectionHandler;
                 break;
             case "select-row":
-                this.currentHandler = new RowMultiSelection(this.canvas, this.grid);
+                this.currentHandler = this.rowMultiSelection;
                 break;
             case "select-cells":
-                this.currentHandler = new SelectionManager(this.canvas, this.grid);
+                this.currentHandler = this.selectionManager;
                 break;
             default:
                 this.currentHandler = null;
@@ -82,26 +98,42 @@ export class HandlerManager {
     }
     determineHandlerType(e) {
         const rect = this.canvas.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
-        const headerHeight = this.grid.getRowHeight(0);
-        const rowHeaderWidth = this.grid.getColWidth(0);
-        if (y <= headerHeight && this.isInColumnResizeZone(x, y)) {
-            return "resize-column";
-        }
-        if (x <= rowHeaderWidth && this.isInRowResizeZone(x, y)) {
+        const x = (e.clientX - rect.left) / this.grid.zoom;
+        const y = (e.clientY - rect.top) / this.grid.zoom;
+        // const headerHeight = this.grid.getRowHeight(0);
+        // const rowHeaderWidth = this.grid.getColWidth(0);
+        if (this.rowResizeHandler && this.rowResizeHandler.isInRowResizeZone(x, y)) {
             return "resize-row";
         }
-        if (y <= headerHeight && x >= rowHeaderWidth) {
-            return "select-column";
+        if (this.resizeColumnHandler && this.resizeColumnHandler.isInResizeZone(x, y)) {
+            return "resize-column";
         }
-        if (x <= rowHeaderWidth && y >= headerHeight) {
-            return "select-row";
-        }
-        if (x >= rowHeaderWidth && y >= headerHeight) {
+        if (this.selectionManager && this.selectionManager.isInSelectionArea(x, y)) {
             return "select-cells";
         }
+        if (this.columnSelectionHandler && this.columnSelectionHandler.isInMultiColumnResizeZone(x, y)) {
+            return "select-column";
+        }
+        if (this.rowMultiSelection && this.rowMultiSelection.isInRowResizeZone(x, y)) {
+            return "select-row";
+        }
         return "none";
+        // if (y <= headerHeight && this.isInColumnResizeZone(x, y)) {
+        //   return "resize-column";
+        // }
+        // if (x <= rowHeaderWidth && this.isInRowResizeZone(x, y)) {
+        //   return "resize-row";
+        // }
+        // if (y <= headerHeight && x >= rowHeaderWidth) {
+        //   return "select-column";
+        // }
+        // if (x <= rowHeaderWidth && y >= headerHeight) {
+        //   return "select-row";
+        // }
+        // if (x >= rowHeaderWidth && y >= headerHeight) {
+        //   return "select-cells";
+        // }
+        // return "none";
     }
     isInColumnResizeZone(x, y) {
         const headerHeight = this.grid.getRowHeight(0);

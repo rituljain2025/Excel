@@ -22,11 +22,11 @@ export class SelectionManager {
 
   constructor(private canvas: HTMLCanvasElement, private grid: Grid) {
     // Attach event listeners
-    this.canvas.addEventListener("mousedown", this.handleMouseDown);
-    this.canvas.addEventListener("mousemove", this.handleMouseMove);
-    this.canvas.addEventListener("mouseup", this.handleMouseUp);
-    this.canvas.addEventListener("click", this.handleClick);
-    document.addEventListener("keydown", this.handleKeyDown);
+    // this.canvas.addEventListener("mousedown", this.onMouseDown);
+    // this.canvas.addEventListener("mousemove", this.onMouseMove);
+    // this.canvas.addEventListener("mouseup", this.onMouseUp);
+    // this.canvas.addEventListener("click", this.handleClick);
+    // document.addEventListener("keydown", this.handleKeyDown);
   }
 
   // Temporarily suppress header click (to prevent conflict with resizing)
@@ -35,13 +35,13 @@ export class SelectionManager {
   }
 
   // Handle mouse down to start drag selection
-  private handleMouseDown = (e: MouseEvent): void => {
+  private onMouseDown = (e: MouseEvent): void => {
     if ((this.canvas as any)._isResizing || (this.canvas as any)._isRowResizing) return;
     if (Date.now() < this.suppressHeaderClick) return;
 
     const rect = this.canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const x = (e.clientX - rect.left) / this.grid.zoom;
+    const y = (e.clientY - rect.top) / this.grid.zoom;
     const headerHeight = this.grid.rowHeights[0];
     const rowHeaderWidth = this.grid.colWidths[0];
 
@@ -84,12 +84,22 @@ export class SelectionManager {
       }
     }
   };
+  public isInSelectionArea(x:number, y:number): boolean {
+    const rect = this.canvas.getBoundingClientRect();
+    const localX = (x - rect.left) / this.grid.zoom;
+    const localY = (y - rect.top) / this.grid.zoom;
+    const headerHeight = this.grid.rowHeights[0];
+    const rowHeaderWidth = this.grid.colWidths[0];
+
+    return localX >= rowHeaderWidth && localY >= headerHeight &&
+           localX < this.canvas.width && localY < this.canvas.height;
+  }
 
   // Update selection area during drag
   private updateSelectionFromMouse(x: number, y: number): void {
     const rect = this.canvas.getBoundingClientRect();
-    const localX = x - rect.left;
-    const localY = y - rect.top;
+    const localX = (x - rect.left) / this.grid.zoom;
+    const localY = (y - rect.top) / this.grid.zoom;
     const headerHeight = this.grid.rowHeights[0];
     const rowHeaderWidth = this.grid.colWidths[0];
 
@@ -113,14 +123,14 @@ export class SelectionManager {
   }
 
   // Handle mouse move to update selection box
-  private handleMouseMove = (e: MouseEvent): void => {
+  private onMouseMove = (e: MouseEvent): void => {
     if (!this.isDragging) return;
     this.lastMouseEvent = e;
     this.updateSelectionFromMouse(e.clientX, e.clientY);
   };
 
   // End drag selection on mouse up
-  private handleMouseUp = (e: MouseEvent): void => {
+  private onMouseUp = (e: MouseEvent): void => {
     this.stopAutoScroll();
     if (this.isDragging) {
       this.isDragging = false;
@@ -139,8 +149,8 @@ export class SelectionManager {
       if (!this.isDragging || !this.lastMouseEvent) return;
 
       const rect = this.canvas.getBoundingClientRect();
-      const dx = this.lastMouseEvent.clientX - rect.left;
-      const dy = this.lastMouseEvent.clientY - rect.top;
+      const dx = (this.lastMouseEvent.clientX - rect.left) / this.grid.zoom;
+      const dy = (this.lastMouseEvent.clientY - rect.top) / this.grid.zoom;
       let scrolled = false;
 
       if (dy > container.clientHeight - buffer) {
@@ -176,14 +186,15 @@ export class SelectionManager {
 
   // Handle clicks on column/row headers or grid body
   private handleClick = (e: MouseEvent): void => {
+   
     // If we are resizing, do not handle clicks
     if ((this.canvas as any)._isResizing || (this.canvas as any)._isRowResizing) return;
     if (this.isDragging || Date.now() < this.suppressHeaderClick) return;
     
 
     const rect = this.canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const x = (e.clientX - rect.left) / this.grid.zoom;
+    const y = (e.clientY - rect.top) / this.grid.zoom;
 
     const container = document.getElementById("container")!;
     const scrollLeft = container.scrollLeft;
@@ -220,7 +231,7 @@ export class SelectionManager {
   };
 
   // Handle Shift+Arrow and Ctrl+Arrow based selection extension
-  private handleKeyDown = (e: KeyboardEvent): void => {
+  public handleKeyDown = (e: KeyboardEvent): void => {
     if (!this.grid.selectedCells || !e.shiftKey) return;
 
     let endRow = this.grid.selectedCells.endRow;
@@ -245,7 +256,7 @@ export class SelectionManager {
           if (endRow > this.startRowDown!) endRow--;
           else if (this.anchorRow! > 1) this.anchorRow!--;
           break;
-        case "ArrowRight":
+        case "ArrowRight": 
           if (this.anchorCol! < endCol && this.anchorCol !== this.startColDown) this.anchorCol!++;
           else if (endCol < this.grid.totalCols - 1) endCol++;
           break;
@@ -278,9 +289,9 @@ export class SelectionManager {
 
   // Cleanup listeners
   public destroy() {
-    this.canvas.removeEventListener("mousedown", this.handleMouseDown);
-    this.canvas.removeEventListener("mousemove", this.handleMouseMove);
-    this.canvas.removeEventListener("mouseup", this.handleMouseUp);
+    this.canvas.removeEventListener("mousedown", this.onMouseDown);
+    this.canvas.removeEventListener("mousemove", this.onMouseMove);
+    this.canvas.removeEventListener("mouseup", this.onMouseUp);
     this.canvas.removeEventListener("click", this.handleClick);
     document.removeEventListener("keydown", this.handleKeyDown);
   }

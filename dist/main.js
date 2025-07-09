@@ -26,6 +26,18 @@ window.addEventListener("DOMContentLoaded", () => {
     // Attach behaviors
     new CellEditor(canvas, grid, undoManager);
     new HandlerManager(canvas, grid, undoManager);
+    const container = document.getElementById("container");
+    container.addEventListener("wheel", (e) => {
+        if (e.ctrlKey) {
+            e.preventDefault();
+            if (e.deltaY < 0) {
+                grid.setZoom(grid.zoom * 1.1);
+            }
+            else {
+                grid.setZoom(grid.zoom / 1.1);
+            }
+        }
+    }, { passive: false });
     /**
      * Attach statistic buttons
      */
@@ -145,9 +157,10 @@ window.addEventListener("DOMContentLoaded", () => {
     canvas.addEventListener("mousedown", (e) => {
         if (canvas._isRowResizing || canvas._isResizing)
             return; // <-- Add this line
+        console.log("Header click detected");
         const rect = canvas.getBoundingClientRect();
-        const y = e.clientY - rect.top;
-        const x = e.clientX - rect.left;
+        const y = (e.clientY - rect.top) / grid.zoom;
+        const x = (e.clientX - rect.left) / grid.zoom;
         const container = document.getElementById("container");
         const scrollTop = container.scrollTop;
         const scrollLeft = container.scrollLeft;

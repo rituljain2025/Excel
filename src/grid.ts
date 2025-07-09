@@ -37,6 +37,7 @@ export class Grid {
   private copyDashOffset: number = 0;
   private copyRange: { startRow: number, startCol: number, endRow: number, endCol: number } | null = null;
   private copyAnimationTimer: number | null = null;
+  public zoom :number = 1;
   constructor(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement) {
     this.ctx = ctx;
     this.canvas = canvas;
@@ -56,6 +57,7 @@ export class Grid {
     const spacer = document.getElementById("spacer")!;
     spacer.style.height = spacerHeight+"px";
     spacer.style.width = spacerWidth + "px";
+   
     this.setupCanvas();
 
     const container = document.getElementById("container")!;
@@ -66,26 +68,27 @@ export class Grid {
       this.drawVisibleGrid(
         container.scrollTop,
         container.scrollLeft,
-        container.clientWidth,
-        container.clientHeight
+        container.clientWidth / this.zoom,
+        container.clientHeight / this.zoom
       );
     });
 
     window.addEventListener("resize", () => {
+      this.dpr = window.devicePixelRatio || 1;
       this.setupCanvas();
       this.redraw();
     });
 
-    this.drawVisibleGrid(0, 0, window.innerWidth, window.innerHeight);
+    this.drawVisibleGrid(0, 0, window.innerWidth/this.zoom, window.innerHeight/this.zoom);
   }
  
   public setupCanvas(): void {
     // const rect = this.canvas.getBoundingClientRect();
      const container = document.getElementById("container")!;
     // Use container's clientWidth/clientHeight for canvas size
-    const width = container.clientWidth;
-    const height = container.clientHeight;
-    
+    const width = container.clientWidth ;
+    const height = container.clientHeight ;
+
     // Set the actual size in memory (scaled up for high DPI)
     this.canvas.width = width * this.dpr;
     this.canvas.height = height * this.dpr;
@@ -96,25 +99,31 @@ export class Grid {
     
     // Reset transform before scaling to avoid stacking scales
     this.ctx.setTransform(1, 0, 0, 1, 0, 0);
-    // Scale the drawing context so everything is drawn at the correct size
-    this.ctx.scale(this.dpr, this.dpr);
+    // // Scale the drawing context so everything is drawn at the correct size
+    // this.ctx.scale(this.dpr, this.dpr);
+
+    this.ctx.setTransform(this.zoom * this.dpr, 0, 0, this.zoom * this.dpr, 0, 0);
   }
  
   private drawCrispLine(x1: number, y1: number, x2: number, y2: number): void {
     // Offset by 0.5 pixels to get crisp 1px lines
-    const offset = 0.5;
-    this.ctx.lineWidth = 1 / this.dpr ;
+    // const offset = 0.5;
+    // this.ctx.lineWidth = 1 / this.dpr ;
+    const offset = 0.5 / this.zoom;
+    this.ctx.lineWidth = 1 / (this.dpr * this.zoom);
     this.ctx.beginPath();
 
     if (x1 === x2) {
       // Vertical line
-      const crispX = Math.round(x1) + offset;
+      // const crispX = Math.round(x1) + offset;
+      const crispX = Math.round(x1 * this.zoom) / this.zoom + offset;
       this.ctx.moveTo(crispX, y1);
       this.ctx.lineTo(crispX, y2);
   
     } else {
       // Horizontal line
-      const crispY = Math.round(y1) + offset;
+      // const crispY = Math.round(y1) + offset;
+       const crispY = Math.round(y1 * this.zoom) / this.zoom + offset;
       this.ctx.moveTo(x1, crispY);
       this.ctx.lineTo(x2, crispY);
     }
@@ -122,11 +131,16 @@ export class Grid {
   }
  
   private drawCrispRect(x: number, y: number, width: number, height: number, fill: boolean = false): void {
-    const offset = 0.5;
-    const crispX = Math.round(x) + offset;
-    const crispY = Math.round(y) + offset;
-    const crispWidth = Math.round(width) - 1 / this.dpr;
-    const crispHeight = Math.round(height) - 1 / this.dpr;
+    // const offset = 0.5;
+    // const crispX = Math.round(x) + offset;
+    // const crispY = Math.round(y) + offset;
+    // const crispWidth = Math.round(width) - 1 / this.dpr;
+    // const crispHeight = Math.round(height) - 1 / this.dpr;
+     const offset = 0.5 / this.zoom;
+    const crispX = Math.round(x * this.zoom) / this.zoom + offset;
+    const crispY = Math.round(y * this.zoom) / this.zoom + offset;
+    const crispWidth = Math.round(width * this.zoom) / this.zoom - 1 / (this.dpr * this.zoom);
+    const crispHeight = Math.round(height * this.zoom) / this.zoom - 1 / (this.dpr * this.zoom);
     
     if (fill) {
       this.ctx.fillRect(Math.round(x), Math.round(y), Math.round(width), Math.round(height));
@@ -204,8 +218,8 @@ export class Grid {
     this.drawVisibleGrid(
       container.scrollTop,
       container.scrollLeft,
-      container.clientWidth,
-      container.clientHeight
+      container.clientWidth / this.zoom,
+      container.clientHeight / this.zoom
     );
   }
 
@@ -336,10 +350,13 @@ export class Grid {
     }
     if (endCol === 0) endCol = this.totalCols;
 
-    this.ctx.font = "12px Arial";
+    // this.ctx.font = "12px Arial";
+    this.ctx.font = `${12 * this.zoom}px Arial`;
+
     this.ctx.textAlign = "center";
     this.ctx.textBaseline = "middle";
-    this.ctx.lineWidth = 1 / this.dpr;
+    // this.ctx.lineWidth = 1 / this.dpr;
+    this.ctx.lineWidth = 1 / (this.dpr * this.zoom);
     
 
     //  Step 1: Draw only cell data (excluding headers) 
@@ -481,7 +498,7 @@ export class Grid {
         this.ctx.textAlign = "right";
         this.ctx.fillText(i.toString(), colWidth-8, rowY + rowH / 2);
       }else{
-        this.ctx.fillStyle = (isSelectedRow || isInSelection ) ? "#137e41" : "#f0f0f0";
+        this.ctx.fillStyle = (isInSelection || isSelectedRow) ? "#137e41" : "#f0f0f0";
         this.ctx.fillRect(0, rowY, colWidth, rowH);
 
         // Borders
@@ -498,6 +515,7 @@ export class Grid {
       }
      
     }
+    
     // Step 3: Draw column headers (first row)
     const headerHeight = this.rowHeights[0];
     for (let j = startCol; j < endCol; j++) {
@@ -684,7 +702,6 @@ export class Grid {
     this.ctx.strokeStyle = "#0078d7";
     this.ctx.lineWidth = 1 / this.dpr;
     this.drawCrispRect(startX + 1, startY + 1, width - 2, height - 2);
-
     // Draw marching ants if in copy mode and this is the copied range
     if (this.isCopyMode && this.copyRange &&
       startRow === this.copyRange.startRow && startCol === this.copyRange.startCol &&
@@ -694,7 +711,7 @@ export class Grid {
       this.ctx.lineDashOffset = -this.copyDashOffset;
       this.ctx.strokeStyle = "#137e41";
       this.ctx.lineWidth = 2 / this.dpr;
-      this.ctx.strokeRect(startX+3, startY+3, width-5, height-5);
+      this.ctx.strokeRect(startX, startY, width, height);
       this.ctx.restore();
     }
   }
@@ -730,16 +747,12 @@ export class Grid {
    
   }
   public setColumnRangeSelection(startCol: number, endCol: number): void {
-    console.log("Setting column range selection from", startCol, "to", endCol);
-    
     this.selectedCells = {
       startRow: 1,
       endRow: this.totalRows - 1,
       startCol,
       endCol
     };
-    console.log("Selected cells:", this.selectedCells);
-    
     this.selectedColumn = null; // clear single column selection
     this.selectedRow = null;
     this.selectionMode = "column";
@@ -935,7 +948,14 @@ export class Grid {
     }
     this.redraw();
   }
-
+  public setZoom(factor: number) {
+    this.zoom = Math.max(0.2, Math.min(5, factor));
+   
+    this.setupCanvas();
+   
+    this.redraw();
+  }
+  
 } 
 
 

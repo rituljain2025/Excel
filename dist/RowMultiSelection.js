@@ -15,15 +15,12 @@ export class RowMultiSelection {
         this.dragStartRow = -1;
         /** The row index where the drag currently ends */
         this.dragEndRow = -1;
-        /**
-         * Handles mouse down event on the canvas to begin row drag selection
-         */
         this.onMouseDown = (e) => {
             if (this.canvas._isRowResizing)
                 return;
             const rect = this.canvas.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
+            const x = (e.clientX - rect.left) / this.grid.zoom;
+            const y = (e.clientY - rect.top) / this.grid.zoom;
             // if(this.rowResizeHandler.isInRowResizeZone(x,y)) return; // Prevent conflict with row resizing
             const container = document.getElementById("container");
             const scrollTop = container?.scrollTop;
@@ -51,7 +48,7 @@ export class RowMultiSelection {
             if (!this.isDragging)
                 return;
             const rect = this.canvas.getBoundingClientRect();
-            const y = e.clientY - rect.top;
+            const y = (e.clientY - rect.top) / this.grid.zoom;
             const container = document.getElementById("container");
             const scrollTop = container.scrollTop;
             const adjustedY = y + scrollTop;
@@ -74,6 +71,14 @@ export class RowMultiSelection {
                 this.isDragging = false;
             }
         };
+    }
+    /**
+     * Handles mouse down event on the canvas to begin row drag selection
+     */
+    isInRowResizeZone(x, y) {
+        const headerHeight = this.grid.getRowHeight(0);
+        const rowHeaderWidth = this.grid.getColWidth(0);
+        return y >= headerHeight && x < rowHeaderWidth;
     }
     destroy() {
         this.canvas.removeEventListener("mousedown", this.onMouseDown);

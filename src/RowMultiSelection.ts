@@ -24,12 +24,17 @@ export class RowMultiSelection {
   /**
    * Handles mouse down event on the canvas to begin row drag selection
    */
+  public isInRowResizeZone(x: number, y: number): boolean {
+    const headerHeight = this.grid.getRowHeight(0);
+    const rowHeaderWidth = this.grid.getColWidth(0);
+    return y >= headerHeight && x < rowHeaderWidth; 
+  }
   public onMouseDown = (e: MouseEvent) => {
     if ((this.canvas as any)._isRowResizing) return;
    
     const rect = this.canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const x =( e.clientX - rect.left) / this.grid.zoom;
+    const y =( e.clientY - rect.top) / this.grid.zoom;
     // if(this.rowResizeHandler.isInRowResizeZone(x,y)) return; // Prevent conflict with row resizing
    
     const container = document.getElementById("container")!;
@@ -62,7 +67,7 @@ export class RowMultiSelection {
     if (!this.isDragging) return;
 
     const rect = this.canvas.getBoundingClientRect();
-    const y = e.clientY - rect.top;
+    const y = (e.clientY - rect.top) / this.grid.zoom;
     const container = document.getElementById("container")!;
     const scrollTop = container.scrollTop;
     const adjustedY = y + scrollTop;

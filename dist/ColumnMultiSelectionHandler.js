@@ -26,19 +26,12 @@ export class ColumnSelectionHandler {
          * @type {number}
          */
         this.endCol = -1;
-        /**
-         * Triggered when the user presses the mouse button.
-         * If the press occurs within the column header area (but not the row header),
-         * it starts tracking for a drag-to-select column range.
-         *
-         * @param {MouseEvent} e - The mouse down event.
-         */
         this.onMouseDown = (e) => {
             if (this.canvas._isResizing)
                 return;
             const rect = this.canvas.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
+            const x = (e.clientX - rect.left) / this.grid.zoom; // Adjust for zoom
+            const y = (e.clientY - rect.top) / this.grid.zoom; // Adjust for zoom
             const container = document.getElementById("container");
             const scrollLeft = container.scrollLeft;
             const headerHeight = this.grid.getRowHeight(0);
@@ -50,7 +43,6 @@ export class ColumnSelectionHandler {
                 if (col > 0) {
                     this.isDragging = true;
                     this.startCol = this.endCol = col;
-                    this.grid.clearSelection();
                     this.grid.setColumnRangeSelection(this.startCol, this.endCol);
                     this.grid.redraw();
                 }
@@ -66,7 +58,7 @@ export class ColumnSelectionHandler {
             if (!this.isDragging)
                 return;
             const rect = this.canvas.getBoundingClientRect();
-            const x = e.clientX - rect.left;
+            const x = (e.clientX - rect.left) / this.grid.zoom; // Adjust for zoom
             const container = document.getElementById("container");
             const scrollLeft = container.scrollLeft;
             const adjustedX = x + scrollLeft;
@@ -94,6 +86,19 @@ export class ColumnSelectionHandler {
                 }
             }
         };
+    }
+    /**
+     * Triggered when the user presses the mouse button.
+     * If the press occurs within the column header area (but not the row header),
+     * it starts tracking for a drag-to-select column range.
+     *
+     * @param {MouseEvent} e - The mouse down event.
+     */
+    isInMultiColumnResizeZone(x, y) {
+        const headerHeight = this.grid.getRowHeight(0);
+        const col = this.grid.getColFromX(x);
+        const colWidth = this.grid.getColWidth(col);
+        return y < headerHeight && x >= colWidth;
     }
     destroy() {
         this.canvas.removeEventListener("mousedown", this.onMouseDown);
