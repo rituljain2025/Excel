@@ -1,11 +1,12 @@
 // SelectionManager.ts
+import { EventHandler } from './EventHandler.js';
 import { Grid } from './grid.js';
 
 /**
  * Manages cell selection, column/row selection, drag selection,
  * keyboard-based selection extension, and auto-scrolling during drag.
  */
-export class SelectionManager {
+export class SelectionManager  implements EventHandler{
   // Selection state flags and tracking variables
   private isDragging = false;
   private dragStartRow = -1;
@@ -20,28 +21,29 @@ export class SelectionManager {
   private startRowDown: number | null = null;
   private startColDown: number | null = null;
 
-  constructor(private canvas: HTMLCanvasElement, private grid: Grid) {
-    // Attach event listeners
-    // this.canvas.addEventListener("mousedown", this.onMouseDown);
-    // this.canvas.addEventListener("mousemove", this.onMouseMove);
-    // this.canvas.addEventListener("mouseup", this.onMouseUp);
-    // this.canvas.addEventListener("click", this.handleClick);
-    // document.addEventListener("keydown", this.handleKeyDown);
-  }
+  constructor(private canvas: HTMLCanvasElement, private grid: Grid) {}
 
-  // Temporarily suppress header click (to prevent conflict with resizing)
-  public suppressNextHeaderClick(): void {
-    this.suppressHeaderClick = Date.now() + 60;
-  }
+  public hitTest(x:number, y:number): boolean {
+    const rect = this.canvas.getBoundingClientRect();
+    const localX = (x - rect.left) ;
+    const localY = (y - rect.top);
+    const headerHeight = this.grid.rowHeights[0];
+    const rowHeaderWidth = this.grid.colWidths[0];
 
+    return localX >= rowHeaderWidth && localY >= headerHeight &&
+           localX < this.canvas.width && localY < this.canvas.height;
+  }
+  public getCursor(x :number,y:number): string {
+    return "cell";
+  }
   // Handle mouse down to start drag selection
-  private onMouseDown = (e: MouseEvent): void => {
+  public onMouseDown = (e: MouseEvent): void => {
     if ((this.canvas as any)._isResizing || (this.canvas as any)._isRowResizing) return;
     if (Date.now() < this.suppressHeaderClick) return;
 
     const rect = this.canvas.getBoundingClientRect();
-    const x = (e.clientX - rect.left) / this.grid.zoom;
-    const y = (e.clientY - rect.top) / this.grid.zoom;
+    const x = (e.clientX - rect.left);
+    const y = (e.clientY - rect.top) ;
     const headerHeight = this.grid.rowHeights[0];
     const rowHeaderWidth = this.grid.colWidths[0];
 
@@ -84,22 +86,13 @@ export class SelectionManager {
       }
     }
   };
-  public isInSelectionArea(x:number, y:number): boolean {
-    const rect = this.canvas.getBoundingClientRect();
-    const localX = (x - rect.left) / this.grid.zoom;
-    const localY = (y - rect.top) / this.grid.zoom;
-    const headerHeight = this.grid.rowHeights[0];
-    const rowHeaderWidth = this.grid.colWidths[0];
-
-    return localX >= rowHeaderWidth && localY >= headerHeight &&
-           localX < this.canvas.width && localY < this.canvas.height;
-  }
+ 
 
   // Update selection area during drag
   private updateSelectionFromMouse(x: number, y: number): void {
     const rect = this.canvas.getBoundingClientRect();
-    const localX = (x - rect.left) / this.grid.zoom;
-    const localY = (y - rect.top) / this.grid.zoom;
+    const localX = (x - rect.left) ;
+    const localY = (y - rect.top) ;
     const headerHeight = this.grid.rowHeights[0];
     const rowHeaderWidth = this.grid.colWidths[0];
 
@@ -123,14 +116,14 @@ export class SelectionManager {
   }
 
   // Handle mouse move to update selection box
-  private onMouseMove = (e: MouseEvent): void => {
+  public onMouseMove = (e: MouseEvent): void => {
     if (!this.isDragging) return;
     this.lastMouseEvent = e;
     this.updateSelectionFromMouse(e.clientX, e.clientY);
   };
 
   // End drag selection on mouse up
-  private onMouseUp = (e: MouseEvent): void => {
+  public onMouseUp = (e: MouseEvent): void => {
     this.stopAutoScroll();
     if (this.isDragging) {
       this.isDragging = false;
@@ -149,8 +142,8 @@ export class SelectionManager {
       if (!this.isDragging || !this.lastMouseEvent) return;
 
       const rect = this.canvas.getBoundingClientRect();
-      const dx = (this.lastMouseEvent.clientX - rect.left) / this.grid.zoom;
-      const dy = (this.lastMouseEvent.clientY - rect.top) / this.grid.zoom;
+      const dx = (this.lastMouseEvent.clientX - rect.left);
+      const dy = (this.lastMouseEvent.clientY - rect.top);
       let scrolled = false;
 
       if (dy > container.clientHeight - buffer) {
@@ -193,8 +186,8 @@ export class SelectionManager {
     
 
     const rect = this.canvas.getBoundingClientRect();
-    const x = (e.clientX - rect.left) / this.grid.zoom;
-    const y = (e.clientY - rect.top) / this.grid.zoom;
+    const x = (e.clientX - rect.left) ;
+    const y = (e.clientY - rect.top) ;
 
     const container = document.getElementById("container")!;
     const scrollLeft = container.scrollLeft;
@@ -287,12 +280,5 @@ export class SelectionManager {
     this.grid.redraw();
   };
 
-  // Cleanup listeners
-  public destroy() {
-    this.canvas.removeEventListener("mousedown", this.onMouseDown);
-    this.canvas.removeEventListener("mousemove", this.onMouseMove);
-    this.canvas.removeEventListener("mouseup", this.onMouseUp);
-    this.canvas.removeEventListener("click", this.handleClick);
-    document.removeEventListener("keydown", this.handleKeyDown);
-  }
+ 
 }

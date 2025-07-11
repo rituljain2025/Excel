@@ -1,210 +1,118 @@
 // HandlerManager.ts
 
 import { Grid } from "./grid.js";
-import { SelectionManager } from "./SelectionManager.js";
-import { ColumnSelectionHandler } from "./ColumnMultiSelectionHandler.js";
-import { RowMultiSelection } from "./RowMultiSelection.js";
-import { ResizeHandler } from "./resizeHandler.js";
-import { RowResizeHandler } from "./rowResizeHandler.js";
-import { UndoManager } from "./commands/UndoManager.js";
+import { EventHandler } from "./EventHandler.js";
 
-
-type HandlerType = "resize-column" | "resize-row" | "select-column" | "select-row" | "select-cells" | "none" ;
-
+/**
+ * Manages delegation of mouse events to appropriate event handlers based on hit testing.
+ * This class centralizes mouse interactions such as resize, selection, and drag operations
+ * by delegating them to matching handlers that implement the EventHandler interface.
+ */
 export class HandlerManager {
-  private currentHandler: any = null;
-  private currentType: HandlerType = "none";
-  private resizeColumnHandler: ResizeHandler | null = null;
-  private rowResizeHandler: RowResizeHandler | null = null;
-  private columnSelectionHandler: ColumnSelectionHandler | null = null;
-  private rowMultiSelection: RowMultiSelection | null = null; 
-  private selectionManager: SelectionManager | null = null;
- 
+  /** Currently active event handler */
+  private currentHandler: EventHandler | null = null;
+
+  /** List of all available handlers to delegate events to */
+  private handlers: EventHandler[];
+
+  /**
+   * Initializes the HandlerManager.
+   * @param {HTMLCanvasElement} canvas - The canvas on which mouse events occur.
+   * @param {Grid} grid - Reference to the grid for context in handlers.
+   * @param {EventHandler[]} handlers - List of all possible handlers.
+   */
   constructor(
     private canvas: HTMLCanvasElement,
     private grid: Grid,
-    private undoManager: UndoManager
+    handlers: EventHandler[]
   ) {
-    this.resizeColumnHandler = new ResizeHandler(this.canvas, this.grid, this.undoManager);
-    this.rowResizeHandler = new RowResizeHandler(this.canvas, this.grid, this.undoManager);
-    this.columnSelectionHandler = new ColumnSelectionHandler(this.canvas, this.grid);
-    this.rowMultiSelection = new RowMultiSelection(this.canvas, this.grid);
-    this.selectionManager = new SelectionManager(this.canvas, this.grid);
-    
+    this.handlers = handlers;
     this.attach();
   }
+
+  /**
+   * Attaches mouse event listeners to the canvas.
+   */
   private attach() {
     this.canvas.addEventListener("mousedown", this.onMouseDown);
     this.canvas.addEventListener("mousemove", this.onMouseMove);
     this.canvas.addEventListener("mouseup", this.onMouseUp);
-    this.canvas.addEventListener("mouseleave", this.onMouseLeave);
-    
-    document.addEventListener("keydown", this.onKeyDown);
   }
-  private onMouseDown = (e: MouseEvent) => {
-    const type = this.determineHandlerType(e);
 
-    if (type !== this.currentType) {
-      this.switchHandler(type);
-    }
-    
-    if (this.currentHandler && this.currentHandler.onMouseDown) {
+  /**
+   * Handles the `mousedown` event and sets the appropriate handler based on cursor position.
+   * @param {MouseEvent} e - The mouse event object.
+   */
+  private onMouseDown = (e: MouseEvent) => {
+    this.currentHandler = this.determineHandlerType(e);
+    if (this.currentHandler) {
       this.currentHandler.onMouseDown(e);
     }
   };
-  private onKeyDown = (e: KeyboardEvent) => { 
-    if (this.currentHandler && this.currentHandler.handleKeyDown) {
-      this.currentHandler.handleKeyDown(e);
-    }
-  }
-  private onMouseMove = (e: MouseEvent) => {
-    
+
+  /**
+   * Determines the cursor style to display based on the handler under the pointer.
+   * @param {MouseEvent} e - The mouse event object.
+   * @returns {string} The CSS cursor style.
+   */
+  private getCursor = (e: MouseEvent) => {
     const rect = this.canvas.getBoundingClientRect();
-    const x =( e.clientX - rect.left) / this.grid.zoom;
-    const y = (e.clientY - rect.top) / this.grid.zoom;
-    if(this.isInColumnResizeZone(x,y)) {
-      this.canvas.style.cursor = "col-resize";
-      
-    } else if(this.isInRowResizeZone(x,y)) {
-      this.canvas.style.cursor = "row-resize";
-    } else {
-      this.canvas.style.cursor = "cell";
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const handler = this.determineHandlerType(e);
+    return handler!.getCursor(x, y);
+  };
+
+  /**
+   * Updates the canvas cursor style by checking which handler is under the pointer.
+   * @param {MouseEvent} e - The mouse event object.
+   */
+  private updateCursor = (e: MouseEvent) => {
+    const cursor = this.getCursor(e);
+    this.canvas.style.cursor = cursor;
+  };
+
+  /**
+   * Handles the `mousemove` event and delegates it to the current active handler.
+   * Also updates cursor if no handler is currently active.
+   * @param {MouseEvent} e - The mouse event object.
+   */
+  private onMouseMove = (e: MouseEvent) => {
+    if (!this.currentHandler) {
+      this.updateCursor(e);
     }
-    if (this.currentHandler && this.currentHandler.onMouseMove ) {
+
+    if (this.currentHandler) {
       this.currentHandler.onMouseMove(e);
     }
   };
+
+  /**
+   * Handles the `mouseup` event and notifies the current active handler.
+   * @param {MouseEvent} e - The mouse event object.
+   */
   private onMouseUp = (e: MouseEvent) => {
-    if (this.currentHandler && this.currentHandler.onMouseUp) {
+    if (this.currentHandler) {
       this.currentHandler.onMouseUp(e);
     }
-   
   };
-  private onMouseLeave = (e: MouseEvent) => {
-    if (this.currentHandler && this.currentHandler.onMouseLeave) {
-      this.currentHandler.onMouseLeave(e);
-    }
-  };
-  private switchHandler(type: HandlerType) {
-    if (this.currentHandler && this.currentHandler.destroy) {
-      this.currentHandler.destroy();
-    }
-    this.currentType = type;
-    switch (type) {
-      case "resize-column":
-        this.currentHandler = this.resizeColumnHandler;
-        break;
-      case "resize-row":
-        this.currentHandler = this.rowResizeHandler;
-        break;
-      case "select-column":
-        this.currentHandler = this.columnSelectionHandler;
-        break;
-      case "select-row":
-        this.currentHandler = this.rowMultiSelection;
-        break;
-      case "select-cells":
-        this.currentHandler = this.selectionManager;
-        break;
-      default:
-        this.currentHandler = null;
-    }
-  }
-  private determineHandlerType(e: MouseEvent): HandlerType {
+
+  /**
+   * Determines which event handler should be active based on the pointer coordinates.
+   * Performs hit testing with all handlers.
+   * @param {MouseEvent} e - The mouse event object.
+   * @returns {EventHandler | null} - The handler under the pointer, or null if none.
+   */
+  private determineHandlerType(e: MouseEvent): EventHandler | null {
     const rect = this.canvas.getBoundingClientRect();
-    const x =( e.clientX - rect.left) / this.grid.zoom;
-    const y = (e.clientY - rect.top) / this.grid.zoom;
-    // const headerHeight = this.grid.getRowHeight(0);
-    // const rowHeaderWidth = this.grid.getColWidth(0);
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
 
-    if (this.rowResizeHandler && this.rowResizeHandler.isInRowResizeZone(x, y)) {
-      return "resize-row";
+    for (const handler of this.handlers) {
+      if (handler && handler.hitTest(x, y)) {
+        return handler;
+      }
     }
-    if (this.resizeColumnHandler && this.resizeColumnHandler.isInResizeZone(x, y)) {
-      return "resize-column";
-    }
-    if (this.selectionManager && this.selectionManager.isInSelectionArea(x, y)) {
-      return "select-cells";
-    }
-
-    if (this.columnSelectionHandler && this.columnSelectionHandler.isInMultiColumnResizeZone(x, y)) {
-      return "select-column";
-    }
-    if (this.rowMultiSelection && this.rowMultiSelection.isInRowResizeZone(x, y)) {
-      return "select-row";
-    }
-   
-    return "none";
-    // if (y <= headerHeight && this.isInColumnResizeZone(x, y)) {
-    //   return "resize-column";
-    // }
-    // if (x <= rowHeaderWidth && this.isInRowResizeZone(x, y)) {
-    //   return "resize-row";
-    // }
-    // if (y <= headerHeight && x >= rowHeaderWidth) {
-    //   return "select-column";
-    // }
-    // if (x <= rowHeaderWidth && y >= headerHeight) {
-    //   return "select-row";
-    // }
-    // if (x >= rowHeaderWidth && y >= headerHeight) {
-    //   return "select-cells";
-    // }
-    // return "none";
+    return null;
   }
-  private isInColumnResizeZone(x: number, y: number): boolean {
-   
-   
-     const headerHeight = this.grid.getRowHeight(0);
-     
-    if (y > headerHeight) return false;
-
-    const container = document.getElementById("container")!;
-    const scrollLeft = container.scrollLeft;
-    const adjustedX = x + scrollLeft;
-    let cumulativeX = 0;
-    const tolerance = 5;
-
-    for (let col = 0; col < this.grid.totalCols; col++) {
-      const width = this.grid.getColWidth(col);
-      const rightEdge = cumulativeX + width;
-
-      if (Math.abs(adjustedX - rightEdge) <= tolerance) {
-        return true;
-      }
-
-      cumulativeX += width;
-      if (cumulativeX > adjustedX + this.canvas.clientWidth) {
-        break;
-      }
-    }
-    return false;
-  }
-  private isInRowResizeZone(x: number, y: number): boolean {
-    const rowHeaderWidth = this.grid.getColWidth(0);
-    if (x > rowHeaderWidth) return false;
-
-    const container = document.getElementById("container")!;
-    const scrollTop = container.scrollTop;
-    const adjustedY = y + scrollTop;
-    let cumulativeY = 0;
-    const tolerance = 5;
-
-    for (let row = 0; row < this.grid.totalRows; row++) {
-      const height = this.grid.getRowHeight(row);
-      const bottomEdge = cumulativeY + height;
-
-      if (Math.abs(adjustedY - bottomEdge) <= tolerance) {
-        return true;
-      }
-
-      cumulativeY += height;
-      if (cumulativeY > adjustedY + this.canvas.clientHeight) {
-        break;
-      }
-    }
-
-
-    return false;
-  }
-} 
+}

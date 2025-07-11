@@ -8,6 +8,11 @@ import { InsertColumnCommand } from './commands/InsertColumnCommand.js';
 import { DeleteRowCommand } from './commands/DeleteRowCommand.js';
 import { DeleteColumnCommand } from './commands/DeleteColumnCommand.js';
 import { HandlerManager } from './HandlerManager.js';
+import { SelectionManager } from './SelectionManager.js';
+import { ColumnSelectionHandler } from './ColumnMultiSelectionHandler.js';
+import { RowMultiSelection } from './RowMultiSelection.js';
+import { RowResizeHandler } from './rowResizeHandler.js';
+import { ResizeHandler } from './resizeHandler.js';
 window.addEventListener("DOMContentLoaded", () => {
     /**
      * Setup canvas with proper device pixel ratio scaling
@@ -23,21 +28,22 @@ window.addEventListener("DOMContentLoaded", () => {
     // Initialize grid and supporting classes
     const grid = new Grid(ctx, canvas);
     const undoManager = new UndoManager();
+    const selectionManager = new SelectionManager(canvas, grid);
+    const columnSelectionHandler = new ColumnSelectionHandler(canvas, grid);
+    const rowMultiSelection = new RowMultiSelection(canvas, grid);
+    const resizeHandler = new ResizeHandler(canvas, grid, undoManager);
+    const rowResizeHandler = new RowResizeHandler(canvas, grid, undoManager);
+    document.addEventListener("keydown", selectionManager.handleKeyDown);
+    const handlers = [
+        resizeHandler,
+        rowResizeHandler,
+        selectionManager,
+        columnSelectionHandler,
+        rowMultiSelection
+    ];
     // Attach behaviors
     new CellEditor(canvas, grid, undoManager);
-    new HandlerManager(canvas, grid, undoManager);
-    const container = document.getElementById("container");
-    container.addEventListener("wheel", (e) => {
-        if (e.ctrlKey) {
-            e.preventDefault();
-            if (e.deltaY < 0) {
-                grid.setZoom(grid.zoom * 1.1);
-            }
-            else {
-                grid.setZoom(grid.zoom / 1.1);
-            }
-        }
-    }, { passive: false });
+    new HandlerManager(canvas, grid, handlers);
     /**
      * Attach statistic buttons
      */
@@ -157,10 +163,9 @@ window.addEventListener("DOMContentLoaded", () => {
     canvas.addEventListener("mousedown", (e) => {
         if (canvas._isRowResizing || canvas._isResizing)
             return; // <-- Add this line
-        console.log("Header click detected");
         const rect = canvas.getBoundingClientRect();
-        const y = (e.clientY - rect.top) / grid.zoom;
-        const x = (e.clientX - rect.left) / grid.zoom;
+        const y = (e.clientY - rect.top);
+        const x = (e.clientX - rect.left);
         const container = document.getElementById("container");
         const scrollTop = container.scrollTop;
         const scrollLeft = container.scrollLeft;

@@ -2,11 +2,12 @@ import { UndoManager } from './commands/UndoManager.js';
 import { Grid } from './grid.js';
 import { ResizeColumnCommand } from './commands/ResizeColumnCommand.js';
 import { MultiCommand } from './commands/command.js';
+import { EventHandler } from './EventHandler.js';
 
 /**
  * Handles resizing of columns in the grid when the user drags near column edges.
  */
-export class ResizeHandler {
+export class ResizeHandler implements EventHandler{
   /** Whether a resize operation is in progress */
   private isResizing = false;
   /** X-coordinate where resize started */
@@ -42,7 +43,7 @@ export class ResizeHandler {
   private findResizableBorder(x: number): { col: number; borderX: number } | null {
     const container = document.getElementById("container")!;
     const scrollLeft = container.scrollLeft;
-    const adjustedX = x + scrollLeft; // Adjust for zoom level
+    const adjustedX = x + scrollLeft; 
     let cumulativeX = 0;
 
     const totalCols = this.grid.totalCols || 500;
@@ -74,10 +75,10 @@ export class ResizeHandler {
   /**
    * Handles mouse down event to initiate resizing if user clicks near column edge
    */
-  private onMouseDown = (e: MouseEvent) => {
+  public onMouseDown = (e: MouseEvent) => {
     const rect = this.canvas.getBoundingClientRect();
-    const x = (e.clientX - rect.left) / this.grid.zoom;
-    const y = (e.clientY - rect.top) / this.grid.zoom;
+    const x = (e.clientX - rect.left);
+    const y = (e.clientY - rect.top) ;
 
     if (!this.isInColumnHeader(y)) return;
 
@@ -109,14 +110,13 @@ export class ResizeHandler {
       e.stopImmediatePropagation();
     }
   };
-
   /**
    * Handles active resizing as user drags the mouse
    */
   private onMouseMoveResize = (e: MouseEvent) => {
     if (!this.isResizing || this.resizingColIndex === -1) return;
     const rect = this.canvas.getBoundingClientRect();
-    const currentX = (e.clientX - rect.left) / this.grid.zoom;
+    const currentX = (e.clientX - rect.left) ;
     const delta = currentX - this.startX;
     const newWidth = this.startWidth + delta;
     if (newWidth >= 30 && newWidth <= 500) {
@@ -132,11 +132,10 @@ export class ResizeHandler {
       this.currentNewWidth = newWidth;
     }
   };
-
   /**
    * Ends the resize operation and registers undo command
    */
-  private onMouseUp = () => {
+  public onMouseUp = () => {
     if (this.isResizing) {
       (this.canvas as any)._isResizing = false;
       const colIndex = this.resizingColIndex;
@@ -176,8 +175,6 @@ export class ResizeHandler {
       window.removeEventListener("mouseup", this.onMouseUp);
     }
   };
-
-
   /**
    * Handles normal mouse movement to show resize cursor near column edges
    */
@@ -185,9 +182,8 @@ export class ResizeHandler {
     if (this.isResizing) return;
 
     const rect = this.canvas.getBoundingClientRect();
-    const x =( e.clientX - rect.left) / this.grid.zoom;
-    const y = (e.clientY - rect.top) / this.grid.zoom;
-
+    const x =( e.clientX - rect.left) ;
+    const y = (e.clientY - rect.top) ;
     if (!this.isInColumnHeader(y)) {
       if (this.isHovering) {
         this.canvas.style.cursor = "default";
@@ -209,40 +205,13 @@ export class ResizeHandler {
       }
     }
   };
-
-  /**
-   * Resets the cursor when the mouse leaves the canvas
-   */
-  private onMouseLeave = () => {
-    if (!this.isResizing && this.isHovering) {
-      this.canvas.style.cursor = "default";
-      this.isHovering = false;
-    }
-  };
-  public isCurrentlyResizing(): boolean {
-    return this.isResizing;
+  public getCursor(x :number,y:number): string {
+    return "col-resize";
   }
-
-  public isInResizeZone(x: number, y: number): boolean {
+  public hitTest(x: number, y: number): boolean {
     if (!this.isInColumnHeader(y)) return false;
     return this.findResizableBorder(x) !== null;
   }
-  /**
-   * Cleans up all event listeners and state
-   */
-  public destroy() {
-    this.canvas.removeEventListener("mousedown", this.onMouseDown);
-    this.canvas.removeEventListener("mousemove", this.onMouseMove);
-    this.canvas.removeEventListener("mouseleave", this.onMouseLeave);
-
-    if (this.isResizing) {
-      window.removeEventListener("mousemove", this.onMouseMoveResize);
-      window.removeEventListener("mouseup", this.onMouseUp);
-      this.canvas.style.cursor = "default";
-      document.body.style.cursor = "default";
-    }
-  }
-
 }
 
 

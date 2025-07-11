@@ -1,3 +1,4 @@
+import { EventHandler } from "./EventHandler.js";
 import { Grid } from "./grid.js";
 
 
@@ -5,7 +6,7 @@ import { Grid } from "./grid.js";
  * Handles mouse-based column range selection in the grid.
  * This allows users to click and drag across column headers to select multiple columns.
  */
-export class ColumnSelectionHandler {
+export class ColumnSelectionHandler implements EventHandler{
   /**
    * Indicates whether a drag operation is in progress.
    * @type {boolean}
@@ -23,6 +24,8 @@ export class ColumnSelectionHandler {
    * @type {number}
    */
   private endCol = -1;
+  private autoScrollInterval: number | null = null;
+  private lastMouseEvent: MouseEvent | null = null;
 
   /**
    * Attaches mouse event listeners to the canvas to manage column selection.
@@ -30,7 +33,7 @@ export class ColumnSelectionHandler {
    * @param {Grid} grid - The grid instance to manipulate column selection state.
    */
   constructor(private canvas: HTMLCanvasElement, private grid: Grid) {}
-
+  
   /**
    * Triggered when the user presses the mouse button.
    * If the press occurs within the column header area (but not the row header),
@@ -38,18 +41,11 @@ export class ColumnSelectionHandler {
    * 
    * @param {MouseEvent} e - The mouse down event.
    */
-  public isInMultiColumnResizeZone(x: number, y: number): boolean {
-    const headerHeight = this.grid.getRowHeight(0);
-    const col = this.grid.getColFromX(x);
-    const colWidth = this.grid.getColWidth(col);
-    return y < headerHeight && x >= colWidth;
-  }
-
   public onMouseDown = (e: MouseEvent) => {
     if ((this.canvas as any)._isResizing) return;
     const rect = this.canvas.getBoundingClientRect();
-    const x = (e.clientX - rect.left) / this.grid.zoom; // Adjust for zoom
-    const y = (e.clientY - rect.top) / this.grid.zoom; // Adjust for zoom
+    const x = (e.clientX - rect.left) ; 
+    const y = (e.clientY - rect.top) ;
 
     const container = document.getElementById("container")!;
     const scrollLeft = container.scrollLeft;
@@ -63,6 +59,8 @@ export class ColumnSelectionHandler {
         if (col > 0) {
           this.isDragging = true;
           this.startCol = this.endCol = col;
+       
+          this.grid.isColumnDragging = true;
           this.grid.setColumnRangeSelection(this.startCol, this.endCol);
           this.grid.redraw();
         }
@@ -77,9 +75,9 @@ export class ColumnSelectionHandler {
    */
   public onMouseMove = (e: MouseEvent) => {
     if (!this.isDragging) return;
-   
+    this.lastMouseEvent = e;
     const rect = this.canvas.getBoundingClientRect();
-    const x = (e.clientX - rect.left) / this.grid.zoom; // Adjust for zoom
+    const x = (e.clientX - rect.left)
     const container = document.getElementById("container")!;
     const scrollLeft = container.scrollLeft;
     const adjustedX = x + scrollLeft;
@@ -90,11 +88,12 @@ export class ColumnSelectionHandler {
       this.endCol = col;
       const start = Math.min(this.startCol, this.endCol);
       const end = Math.max(this.startCol, this.endCol);
+      this.startAutoScroll();
       this.grid.setColumnRangeSelection(start, end);
       this.grid.redraw();
     }
   };
-
+ 
   /**
    * Triggered when the mouse button is released.
    * Finalizes the column range selection and prevents a single-click from being misinterpreted.
@@ -104,7 +103,8 @@ export class ColumnSelectionHandler {
   public onMouseUp = (_e: MouseEvent) => {
     if (this.isDragging) {
         this.isDragging = false;
-      
+        this.stopAutoScroll();
+        this.grid.isColumnDragging = false;
         if (this.grid.onStatsUpdateCallback) {
             const stats = this.grid.computeSelectedCellStats();
             this.grid.onStatsUpdateCallback(stats);
@@ -113,9 +113,53 @@ export class ColumnSelectionHandler {
     }
   };
 
-  public destroy(): void {
-    this.canvas.removeEventListener("mousedown", this.onMouseDown);
-    this.canvas.removeEventListener("mousemove", this.onMouseMove);
-    this.canvas.removeEventListener("mouseup", this.onMouseUp);
+  private startAutoScroll() : void{
+    if(this.autoScrollInterval !== null) return;
+    const container = document.getElementById("container")!;
+    const buffer = 50; // pixels from the edge to trigger scroll
+    const scrollSpeed = 30; // pixels per interval
+    const intervalTime = 20; // milliseconds
+
+    this.autoScrollInterval = setInterval(() => {
+      if(!this.isDragging || !this.lastMouseEvent) return;
+      const rect = this.canvas.getBoundingClientRect();
+      const x = (this.lastMouseEvent!.clientX - rect.left);
+      let scrolled = false;
+
+      if (x < buffer) {
+        container.scrollLeft -= scrollSpeed;
+        scrolled = true;
+      } else if (x > container.clientWidth - buffer) {
+        container.scrollLeft += scrollSpeed;
+        scrolled = true;
+      }
+      
+      if(scrolled) {
+        const adjustedX = x + container.scrollLeft;
+        const col = this.grid.getColFromX(adjustedX);
+        if (col > 0) {
+          this.endCol = col;
+          const start = Math.min(this.startCol, this.endCol);
+          const end = Math.max(this.startCol, this.endCol);
+          this.grid.setColumnRangeSelection(start, end);
+          this.grid.redraw();
+        }
+      }
+    }, intervalTime);
+  }
+  private stopAutoScroll(): void {
+    if (this.autoScrollInterval !== null) {
+      clearInterval(this.autoScrollInterval);
+      this.autoScrollInterval = null;
+    }
+  }
+  public getCursor(x :number,y:number): string {
+    return "cell";
+  }
+  public hitTest(x: number, y: number): boolean {
+    const headerHeight = this.grid.getRowHeight(0);
+    const col = this.grid.getColFromX(x);
+    const colWidth = this.grid.getColWidth(col);
+    return y < headerHeight && x >= colWidth;
   }
 }

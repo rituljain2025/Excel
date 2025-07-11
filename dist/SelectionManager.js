@@ -25,8 +25,8 @@ export class SelectionManager {
             if (Date.now() < this.suppressHeaderClick)
                 return;
             const rect = this.canvas.getBoundingClientRect();
-            const x = (e.clientX - rect.left) / this.grid.zoom;
-            const y = (e.clientY - rect.top) / this.grid.zoom;
+            const x = (e.clientX - rect.left);
+            const y = (e.clientY - rect.top);
             const headerHeight = this.grid.rowHeights[0];
             const rowHeaderWidth = this.grid.colWidths[0];
             // Only trigger selection if clicked inside grid body
@@ -84,8 +84,8 @@ export class SelectionManager {
             if (this.isDragging || Date.now() < this.suppressHeaderClick)
                 return;
             const rect = this.canvas.getBoundingClientRect();
-            const x = (e.clientX - rect.left) / this.grid.zoom;
-            const y = (e.clientY - rect.top) / this.grid.zoom;
+            const x = (e.clientX - rect.left);
+            const y = (e.clientY - rect.top);
             const container = document.getElementById("container");
             const scrollLeft = container.scrollLeft;
             const scrollTop = container.scrollTop;
@@ -188,31 +188,24 @@ export class SelectionManager {
             }
             this.grid.redraw();
         };
-        // Attach event listeners
-        // this.canvas.addEventListener("mousedown", this.onMouseDown);
-        // this.canvas.addEventListener("mousemove", this.onMouseMove);
-        // this.canvas.addEventListener("mouseup", this.onMouseUp);
-        // this.canvas.addEventListener("click", this.handleClick);
-        // document.addEventListener("keydown", this.handleKeyDown);
     }
-    // Temporarily suppress header click (to prevent conflict with resizing)
-    suppressNextHeaderClick() {
-        this.suppressHeaderClick = Date.now() + 60;
-    }
-    isInSelectionArea(x, y) {
+    hitTest(x, y) {
         const rect = this.canvas.getBoundingClientRect();
-        const localX = (x - rect.left) / this.grid.zoom;
-        const localY = (y - rect.top) / this.grid.zoom;
+        const localX = (x - rect.left);
+        const localY = (y - rect.top);
         const headerHeight = this.grid.rowHeights[0];
         const rowHeaderWidth = this.grid.colWidths[0];
         return localX >= rowHeaderWidth && localY >= headerHeight &&
             localX < this.canvas.width && localY < this.canvas.height;
     }
+    getCursor(x, y) {
+        return "cell";
+    }
     // Update selection area during drag
     updateSelectionFromMouse(x, y) {
         const rect = this.canvas.getBoundingClientRect();
-        const localX = (x - rect.left) / this.grid.zoom;
-        const localY = (y - rect.top) / this.grid.zoom;
+        const localX = (x - rect.left);
+        const localY = (y - rect.top);
         const headerHeight = this.grid.rowHeights[0];
         const rowHeaderWidth = this.grid.colWidths[0];
         if (localX >= rowHeaderWidth && localY >= headerHeight) {
@@ -243,8 +236,8 @@ export class SelectionManager {
             if (!this.isDragging || !this.lastMouseEvent)
                 return;
             const rect = this.canvas.getBoundingClientRect();
-            const dx = (this.lastMouseEvent.clientX - rect.left) / this.grid.zoom;
-            const dy = (this.lastMouseEvent.clientY - rect.top) / this.grid.zoom;
+            const dx = (this.lastMouseEvent.clientX - rect.left);
+            const dy = (this.lastMouseEvent.clientY - rect.top);
             let scrolled = false;
             if (dy > container.clientHeight - buffer) {
                 container.scrollTop += scrollSpeed;
@@ -273,13 +266,5 @@ export class SelectionManager {
             clearInterval(this.autoScrollInterval);
             this.autoScrollInterval = null;
         }
-    }
-    // Cleanup listeners
-    destroy() {
-        this.canvas.removeEventListener("mousedown", this.onMouseDown);
-        this.canvas.removeEventListener("mousemove", this.onMouseMove);
-        this.canvas.removeEventListener("mouseup", this.onMouseUp);
-        this.canvas.removeEventListener("click", this.handleClick);
-        document.removeEventListener("keydown", this.handleKeyDown);
     }
 }

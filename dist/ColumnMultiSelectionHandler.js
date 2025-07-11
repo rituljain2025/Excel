@@ -26,12 +26,21 @@ export class ColumnSelectionHandler {
          * @type {number}
          */
         this.endCol = -1;
+        this.autoScrollInterval = null;
+        this.lastMouseEvent = null;
+        /**
+         * Triggered when the user presses the mouse button.
+         * If the press occurs within the column header area (but not the row header),
+         * it starts tracking for a drag-to-select column range.
+         *
+         * @param {MouseEvent} e - The mouse down event.
+         */
         this.onMouseDown = (e) => {
             if (this.canvas._isResizing)
                 return;
             const rect = this.canvas.getBoundingClientRect();
-            const x = (e.clientX - rect.left) / this.grid.zoom; // Adjust for zoom
-            const y = (e.clientY - rect.top) / this.grid.zoom; // Adjust for zoom
+            const x = (e.clientX - rect.left);
+            const y = (e.clientY - rect.top);
             const container = document.getElementById("container");
             const scrollLeft = container.scrollLeft;
             const headerHeight = this.grid.getRowHeight(0);
@@ -43,6 +52,7 @@ export class ColumnSelectionHandler {
                 if (col > 0) {
                     this.isDragging = true;
                     this.startCol = this.endCol = col;
+                    this.grid.isColumnDragging = true;
                     this.grid.setColumnRangeSelection(this.startCol, this.endCol);
                     this.grid.redraw();
                 }
@@ -57,8 +67,9 @@ export class ColumnSelectionHandler {
         this.onMouseMove = (e) => {
             if (!this.isDragging)
                 return;
+            this.lastMouseEvent = e;
             const rect = this.canvas.getBoundingClientRect();
-            const x = (e.clientX - rect.left) / this.grid.zoom; // Adjust for zoom
+            const x = (e.clientX - rect.left);
             const container = document.getElementById("container");
             const scrollLeft = container.scrollLeft;
             const adjustedX = x + scrollLeft;
@@ -67,6 +78,7 @@ export class ColumnSelectionHandler {
                 this.endCol = col;
                 const start = Math.min(this.startCol, this.endCol);
                 const end = Math.max(this.startCol, this.endCol);
+                this.startAutoScroll();
                 this.grid.setColumnRangeSelection(start, end);
                 this.grid.redraw();
             }
@@ -80,6 +92,8 @@ export class ColumnSelectionHandler {
         this.onMouseUp = (_e) => {
             if (this.isDragging) {
                 this.isDragging = false;
+                this.stopAutoScroll();
+                this.grid.isColumnDragging = false;
                 if (this.grid.onStatsUpdateCallback) {
                     const stats = this.grid.computeSelectedCellStats();
                     this.grid.onStatsUpdateCallback(stats);
@@ -87,22 +101,53 @@ export class ColumnSelectionHandler {
             }
         };
     }
-    /**
-     * Triggered when the user presses the mouse button.
-     * If the press occurs within the column header area (but not the row header),
-     * it starts tracking for a drag-to-select column range.
-     *
-     * @param {MouseEvent} e - The mouse down event.
-     */
-    isInMultiColumnResizeZone(x, y) {
+    startAutoScroll() {
+        if (this.autoScrollInterval !== null)
+            return;
+        const container = document.getElementById("container");
+        const buffer = 50; // pixels from the edge to trigger scroll
+        const scrollSpeed = 30; // pixels per interval
+        const intervalTime = 20; // milliseconds
+        this.autoScrollInterval = setInterval(() => {
+            if (!this.isDragging || !this.lastMouseEvent)
+                return;
+            const rect = this.canvas.getBoundingClientRect();
+            const x = (this.lastMouseEvent.clientX - rect.left);
+            let scrolled = false;
+            if (x < buffer) {
+                container.scrollLeft -= scrollSpeed;
+                scrolled = true;
+            }
+            else if (x > container.clientWidth - buffer) {
+                container.scrollLeft += scrollSpeed;
+                scrolled = true;
+            }
+            if (scrolled) {
+                const adjustedX = x + container.scrollLeft;
+                const col = this.grid.getColFromX(adjustedX);
+                if (col > 0) {
+                    this.endCol = col;
+                    const start = Math.min(this.startCol, this.endCol);
+                    const end = Math.max(this.startCol, this.endCol);
+                    this.grid.setColumnRangeSelection(start, end);
+                    this.grid.redraw();
+                }
+            }
+        }, intervalTime);
+    }
+    stopAutoScroll() {
+        if (this.autoScrollInterval !== null) {
+            clearInterval(this.autoScrollInterval);
+            this.autoScrollInterval = null;
+        }
+    }
+    getCursor(x, y) {
+        return "cell";
+    }
+    hitTest(x, y) {
         const headerHeight = this.grid.getRowHeight(0);
         const col = this.grid.getColFromX(x);
         const colWidth = this.grid.getColWidth(col);
         return y < headerHeight && x >= colWidth;
-    }
-    destroy() {
-        this.canvas.removeEventListener("mousedown", this.onMouseDown);
-        this.canvas.removeEventListener("mousemove", this.onMouseMove);
-        this.canvas.removeEventListener("mouseup", this.onMouseUp);
     }
 }

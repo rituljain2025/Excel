@@ -1,12 +1,13 @@
 import { ResizeRowCommand } from "./commands/ResizeRowCommand.js";
 import { Grid } from "./grid.js";
 import { UndoManager } from "./commands/UndoManager.js";
+import { EventHandler } from "./EventHandler.js";
 
 
 /**
  * Handles mouse-based row resizing functionality in the grid.
  */
-export class RowResizeHandler {
+export class RowResizeHandler implements EventHandler {
   /** Whether the user is actively resizing a row */
   private isResizing = false;
 
@@ -37,7 +38,6 @@ export class RowResizeHandler {
       private canvas: HTMLCanvasElement,
       private grid: Grid,
       private undoManager: UndoManager) {}
-
 
   /**
    * Calculates the visible range of rows in the canvas based on scroll position
@@ -70,14 +70,13 @@ export class RowResizeHandler {
 
     return { start, end };
   }
-
   /**
    * Triggered on mouse down — starts resizing if near row border in header area
    */
   public onMouseDown = (e: MouseEvent) => {
     const rect = this.canvas.getBoundingClientRect();
-    const x = (e.clientX - rect.left) / this.grid.zoom;
-    const y = (e.clientY - rect.top) / this.grid.zoom;
+    const x = (e.clientX - rect.left) ;
+    const y = (e.clientY - rect.top);
     const container = document.getElementById("container")!;
     const scrollTop = container.scrollTop;
     const rowHeaderWidth = this.grid.getColWidth(0);
@@ -121,7 +120,6 @@ export class RowResizeHandler {
       }
     }
   };
-
   /**
    * Triggered on mouse move — updates the cursor to row-resize when hovering near row border
    */
@@ -129,8 +127,8 @@ export class RowResizeHandler {
     if (this.isResizing) return;
 
     const rect = this.canvas.getBoundingClientRect();
-    const x = (e.clientX - rect.left) / this.grid.zoom;
-    const y = (e.clientY - rect.top) / this.grid.zoom;
+    const x = (e.clientX - rect.left) ;
+    const y = (e.clientY - rect.top) ;
 
     const container = document.getElementById("container")!;
     const scrollTop = container.scrollTop;
@@ -164,7 +162,6 @@ export class RowResizeHandler {
       this.isHovering = false;
     }
   };
-
   /**
    * Triggered when the mouse leaves the canvas — resets the cursor
    */
@@ -174,7 +171,6 @@ export class RowResizeHandler {
       this.isHovering = false;
     }
   };
-
   /**
    * Handles resizing logic during mouse drag movement
    */
@@ -182,7 +178,7 @@ export class RowResizeHandler {
     if (!this.isResizing) return;
 
     const rect = this.canvas.getBoundingClientRect();
-    const currentY =( e.clientY - rect.top) / this.grid.zoom;
+    const currentY =( e.clientY - rect.top) ;
     const delta = currentY - this.startY;
     const newHeight = this.startHeight + delta;
 
@@ -198,7 +194,6 @@ export class RowResizeHandler {
       this.currentRowHeight = newHeight;
     }
   };
-
   /**
    * Triggered on mouse up — ends resize and pushes command to undo stack
    */
@@ -227,8 +222,10 @@ export class RowResizeHandler {
       document.removeEventListener("mouseup", this.onMouseUp);
     }
   };
-
-  public isInRowResizeZone(x: number, y: number): boolean {
+  public getCursor(x :number,y:number): string {
+    return "row-resize";
+  }
+  public hitTest(x: number, y: number): boolean {
     const rowHeaderWidth = this.grid.getColWidth(0);
     if (x > rowHeaderWidth) return false;
 
@@ -253,21 +250,5 @@ export class RowResizeHandler {
     }
 
     return false;
-  }
-  /**
-   * Destroys the event listeners and resets internal state
-   */
-  public destroy() {
-    this.canvas.removeEventListener("mousedown", this.onMouseDown);
-    this.canvas.removeEventListener("mousemove", this.onMouseMove);
-    this.canvas.removeEventListener("mouseleave", this.onMouseLeave);
-    document.removeEventListener("mousemove", this.onMouseMoveResize);
-    document.removeEventListener("mouseup", this.onMouseUp);
-    if (this.isResizing) {
-      document.removeEventListener("mousemove", this.onMouseMoveResize);
-      document.removeEventListener("mouseup", this.onMouseUp);
-      this.canvas.style.cursor = "default";
-      document.body.style.cursor = "default";
-    }
   }
 }
