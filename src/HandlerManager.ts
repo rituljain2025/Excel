@@ -78,9 +78,9 @@ export class HandlerManager {
    * @param {MouseEvent} e - The mouse event object.
    */
   private onMouseMove = (e: MouseEvent) => {
-    if (!this.currentHandler) {
+   
       this.updateCursor(e);
-    }
+ 
 
     if (this.currentHandler) {
       this.currentHandler.onMouseMove(e);
